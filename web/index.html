@@ -5,10 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <title>US/SCOREBOARD — 미국 주식 스코어보드</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="preload" href="fonts/PretendardVariable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body class="locked">
 <div id="gate" class="gate" hidden>
@@ -142,11 +140,11 @@
       </div>
       <p id="mineMsg" class="small dim" style="margin:8px 0 0"></p>
     </div>
-    <div class="panel pad admin-only">
-      <h2>증권사 앱 캡처로 입력 <span class="tag hi">관리자 전용</span></h2>
+    <div class="panel pad">
+      <h2>증권사 앱 캡처로 입력 <span class="tag">내 Claude 키 사용</span></h2>
       <p class="dim small" style="margin-top:0">증권사 앱의 <b>해외주식 잔고 화면</b>을 캡처해 올리면 Claude 가 종목·수량·평균 매수가를 읽어 줍니다.
         읽은 결과는 <b>확인·수정한 뒤에만</b> 추가됩니다. 캡처 이미지는 <b>Anthropic(Claude)으로 전송</b>되므로 계좌번호·이름이 보이면 가리고 올리세요.
-        설정 탭에 Claude API 키가 필요하고 읽을 때마다 소액이 과금됩니다.</p>
+        <a href="#" data-goto="settings">설정 탭</a>에 <b>본인의 Claude API 키</b>를 넣어야 하고, 사용료는 본인 키로 과금됩니다.</p>
       <div class="row">
         <select id="capBroker" aria-label="캡처한 증권사"></select>
         <input id="capFile" type="file" accept="image/*" multiple aria-label="캡처 이미지">
@@ -154,6 +152,14 @@
       </div>
       <p id="capMsg" class="small dim" style="margin:8px 0 0"></p>
       <div id="capPreview"></div>
+    </div>
+    <div class="panel pad">
+      <h2>AI 포트폴리오 진단 <span class="tag">내 Claude 키 사용</span></h2>
+      <p class="dim small" style="margin-top:0">아래 보유 종목의 비중·손익·업종 쏠림·투자자 경향·뉴스 전망을 Claude 가 <b>초보자도 이해하게 풀어서</b> 설명해 줍니다.
+        매수·매도 지시가 아니라 <b>살펴볼 점</b>을 알려 주는 참고용입니다. 보유 내역(티커·수량·평단·증권사)이 Anthropic(Claude)으로 전송됩니다.</p>
+      <div class="row"><button id="diagBtn" class="primary">내 포트폴리오 진단하기</button></div>
+      <p id="diagMsg" class="small dim" style="margin:8px 0 0"></p>
+      <div id="diagOut"></div>
     </div>
     <div id="mineBody"></div>
   </section>
@@ -235,15 +241,23 @@
       </div>
       <p id="keyStatus" class="dim small"></p>
     </div>
-    <div class="panel pad admin-only">
-      <h2>Claude API 키 (내 주식 캡처 읽기용) <span class="tag hi">관리자 전용</span></h2>
-      <p class="dim">키는 <b>이 브라우저에만</b> 저장되고 api.anthropic.com 으로만 전송됩니다. 캡처 읽기를 쓰지 않으면 넣지 않아도 됩니다.
-        키를 브라우저에 두는 방식이라 <b>공용 컴퓨터에서는 쓰지 말고</b>, 콘솔에서 이 키의 월 사용 한도를 낮게 걸어 두길 권합니다.</p>
+    <div class="panel pad">
+      <h2>내 Claude API 키 <span class="tag">AI 기능용 · 선택</span></h2>
+      <p class="dim">캡처 읽기, AI 포트폴리오 진단, 종목 ‘지금 다시 분석’은 <b>본인의 Claude API 키</b>로 돌아갑니다. 키는 <b>이 브라우저에만</b> 저장되고 api.anthropic.com 으로만 전송되며,
+        사이트 운영자의 키와는 무관합니다(사용료도 본인 키로 과금). 키가 없어도 나머지 기능은 모두 쓸 수 있습니다.<br>
+        키를 브라우저에 두는 방식이라 <b>공용 컴퓨터에서는 쓰지 말고</b>, <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">콘솔</a>에서 이 키의 월 사용 한도도 걸어 두세요.</p>
       <div class="row">
         <input id="akey" type="password" placeholder="Claude API 키" autocomplete="off" spellcheck="false">
         <button id="saveAKey" class="primary">저장</button><button id="clearAKey">지우기</button>
       </div>
+      <div class="row" style="margin-top:8px">
+        <select id="amodel" aria-label="Claude 모델"><option value="claude-sonnet-5-5">Sonnet 5.5 — 정확 (권장)</option><option value="claude-haiku-5-5">Haiku 5.5 — 가장 저렴</option></select>
+        <label class="search" style="flex:0 1 230px"><span>내 사용 한도 $</span><input id="alimit" type="text" inputmode="decimal" aria-label="사용 한도 달러"></label>
+        <button id="aReset">사용액 초기화</button>
+      </div>
+      <p id="aspent" class="small dim" style="margin:8px 0 0"></p>
       <p id="akeyStatus" class="dim small"></p>
+      <p class="small dim" style="margin:0">‘내 사용 한도’는 이 브라우저가 계산한 <b>추정치</b> 기준의 안전장치입니다. 한도를 넘을 것 같은 호출은 보내지 않습니다. 실제 청구액은 콘솔에서 확인하세요.</p>
     </div>
     <div class="panel pad">
       <h2>갱신 주기</h2>
@@ -266,7 +280,7 @@
 <footer>
   투자 판단의 책임은 본인에게 있으며, 본 정보는 투자 권유가 아닙니다. 점수와 전망은 공개 데이터와 뉴스 동향을 기계적으로 처리한 값이고 지연·오류가 있을 수 있습니다.
 </footer>
-<script src="auth.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="auth.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

@@ -1,15 +1,17 @@
+/* Pretendard (SIL Open Font License 1.1, web/fonts/LICENSE.txt) */
+@font-face { font-family: 'Pretendard Variable'; font-weight: 45 920; font-style: normal; font-display: swap; src: url("fonts/PretendardVariable.woff2") format("woff2-variations"); }
 :root {
   --bg: #070708; --panel: #0d0e10; --line: #26282d; --line2: #1b1d21; --line3: #3a3d44;
   --text: #f2f3f5; --text2: #c9ccd2; --dim: #8f949e;
   --up: #ff2d55; --down: #2e7bff; --on: #f2f3f5; --ink: #070708;
   --up-glow: rgba(255, 45, 85, .65); --down-glow: rgba(46, 123, 255, .7);
-  --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
-  --sans: 'IBM Plex Sans KR', system-ui, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+  --mono: 'Pretendard Variable', Pretendard, system-ui, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;   /* 숫자·티커도 Pretendard (tnum 으로 자릿수 정렬) */
+  --sans: 'Pretendard Variable', Pretendard, system-ui, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
 }
 * { box-sizing: border-box; border-radius: 0; }
 [hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; background: var(--bg); }
-body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--sans); }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--sans); font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
 a { color: var(--text); }
 h1 { margin: 4px 0 0; font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
 h2 { margin: 0 0 8px; font-size: 15px; font-weight: 700; }
