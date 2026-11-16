@@ -426,13 +426,13 @@ def run_investors() -> None:
 # ---------------------------------------------------------------- Claude 분석
 
 def run_analyze() -> None:
-    from analysis.llm import Analyst, LLMUnavailable
+    from analysis.llm import Analyst, Ledger, LLMUnavailable
 
     settings = load_config("settings")
     cfg = settings.get("llm", {})
     d = out_dir(settings)
     try:
-        analyst = Analyst(cfg)
+        analyst = Analyst(cfg, Ledger(d / "usage.json", cfg.get("budget_usd", 8.0)))
     except LLMUnavailable as e:
         print(f"[analyze] {e} 쉬운 설명·전망 생성을 건너뜁니다.")
         return
@@ -447,6 +447,7 @@ def run_analyze() -> None:
     an.setdefault("investors", {})
     scores = {s["symbol"]: s for s in (read_json(d / "scores.json") or {}).get("stocks", [])}
     labels = {cid: c.get("label", cid) for cid, c in load_config("weights")["components"].items()}
+    scores_sample = bool((read_json(d / "scores.json") or {}).get("sample"))   # 샘플 점수는 분석 근거로 쓰지 않는다
 
     def save():
         an.update({"generated_at": iso_now(), "model": analyst.model, "sample": False})
@@ -505,8 +506,8 @@ def run_analyze() -> None:
         for _, sym, items, h in todo[: min(cfg.get("max_stocks_per_run", 10), budget)]:
             s = scores[sym]
             payload = {
-                "symbol": sym, "name": s["name"], "sector": s["sector"], "total_score_0_100": s.get("score"),
-                "factor_scores_0_100": {labels.get(c, c): v["score"] for c, v in s.get("components", {}).items()},
+                "symbol": sym, "name": s["name"], "sector": s["sector"], "total_score_0_100": None if scores_sample else s.get("score"),
+                "factor_scores_0_100": {} if scores_sample else {labels.get(c, c): v["score"] for c, v in s.get("components", {}).items()},
                 "day_change_pct": (s.get("quote") or {}).get("dp"),
                 "famous_investor_moves_last_quarter": (inv.get("signals") or {}).get(sym, {}).get("detail", []),
                 "headlines": [{"date": n["published"][:10], "source": n.get("source"), "title": n["title"],
@@ -526,7 +527,9 @@ def run_analyze() -> None:
         for i in inv.get("investors", []):
             heads = i.get("news", [])
             h = digest(i.get("accession"), *sorted(n["id"] for n in heads))
-            if an["investors"].get(i["id"], {}).get("hash") == h or not (heads or i.get("holdings")):
+            last_i = parse_iso(an["investors"].get(i["id"], {}).get("generated_at"))
+            too_soon = bool(last_i and now_utc() - last_i < timedelta(hours=cfg.get("investor_min_hours", 72)))
+            if an["investors"].get(i["id"], {}).get("hash") == h or too_soon or not (heads or i.get("holdings")):
                 continue
             row = lambda x: {"name": x.get("issuer"), "ticker": x.get("ticker"), "action": x.get("action"),
                              "portfolio_pct": x.get("pct"), "share_change_pct": x.get("change_pct"), "option": x.get("put_call")}
@@ -550,6 +553,8 @@ def run_analyze() -> None:
     finally:
         if analyst.calls:
             save()
+            if analyst.ledger:
+                print(f"[analyze] 누적 비용 ${analyst.ledger.spent:.4f} / 예산 ${analyst.ledger.budget:.2f}")
             print(f"[analyze] Claude 호출 {analyst.calls}회, 입력 {analyst.usage['input']:,} / 출력 {analyst.usage['output']:,} 토큰 ({analyst.model})")
 
 

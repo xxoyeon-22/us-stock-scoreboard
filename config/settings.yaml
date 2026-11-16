@@ -15,11 +15,14 @@ llm:
   # 뉴스 쉬운 설명·호재 판단·전망에 쓰는 Claude 모델. 비용을 줄이려면 claude-sonnet-5-5 나 claude-haiku-5-5 로 바꾼다.
   model: claude-sonnet-5-5        # 종목 분석·투자자 요약 (가장 싼 선택: claude-haiku-5-5)
   headline_model: claude-haiku-5-5   # 헤드라인 한 줄 풀이는 단순 작업이라 가장 싼 모델
-  fallbacks: true
-  effort: {headlines: low, stock: medium, investor: medium}
+  fallbacks: false              # 거절 시 더 비싼 모델로 자동 재시도하는 기능 — 비용이 예측 불가라 끔
+  budget_usd: 8.0               # 이 프로젝트가 평생 쓸 수 있는 Claude 비용 상한(달러). 도달하면 AI 분석을 멈춘다
+                                # (콘솔 한도 $11 중 약 $3 은 캡처 읽기 등 브라우저에서 쓰는 몫으로 남겨 둔다)
+  effort: {headlines: low, stock: low, investor: low}
   headline_batch: 40            # 한 번의 호출에 넣는 헤드라인 수
   max_headlines_per_run: 160    # 한 번 실행에서 새로 풀이할 헤드라인 상한
-  max_stocks_per_day: 20        # 하루에 새로 분석할 종목 수 상한 — 비용 상한 역할
+  investor_min_hours: 72        # 같은 투자자 요약을 다시 만들기까지 최소 간격 (비용 절감)
+  max_stocks_per_day: 10       # 하루에 새로 분석할 종목 수 상한 — 비용 상한 역할
   min_hours_between: 12         # 같은 종목을 다시 분석하기까지 최소 간격
   max_stocks_per_run: 10        # 한 번 실행에서 새로 분석할 종목 상한
   stock_news_days: 7            # 종목 분석에 쓰는 뉴스 기간

@@ -82,12 +82,44 @@ STOCK_SCHEMA = _obj({
 INVESTOR_SCHEMA = _obj({"summary": _STR, "remarks": {"type": "array", "items": _STR}, "portfolio_view": _STR})
 
 
+# 모델별 가격 (달러 / 100만 토큰: 입력, 출력). 목록에 없는 모델은 비싼 쪽으로 가정해 예산을 넉넉히 잡는다.
+PRICES = {"claude-haiku-5-5": (0.10, 0.50), "claude-sonnet-5-5": (2.0, 10.0), "claude-opus-5-5": (4.0, 20.0)}
+UNKNOWN_PRICE = (10.0, 50.0)
+MAX_TOKENS = {"headlines": 6000, "stock": 6000, "investor": 4000}
+
+
+class Ledger:
+    """누적 사용액 장부(JSON). 예산을 넘길 수 있는 호출은 아예 보내지 않는다."""
+
+    def __init__(self, path, budget_usd: float):
+        self.path, self.budget = path, float(budget_usd)
+        try:
+            self.data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            self.data = {}
+        self.data.setdefault("total_usd", 0.0)
+        self.data.setdefault("calls", 0)
+
+    @property
+    def spent(self) -> float:
+        return float(self.data["total_usd"])
+
+    def add(self, usd: float) -> None:
+        self.data["total_usd"] = round(self.spent + usd, 6)
+        self.data["calls"] += 1
+        self.data["budget_usd"] = self.budget
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.data, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(self.path)
+
+
 class LLMUnavailable(RuntimeError):
     """키가 없거나 인증·한도 문제로 이번 실행에서는 더 부를 수 없다."""
 
 
 class Analyst:
-    def __init__(self, cfg: dict):
+    def __init__(self, cfg: dict, ledger: "Ledger | None" = None):
+        self.ledger = ledger
         self.model = os.environ.get("LLM_MODEL") or cfg.get("model", "claude-opus-5-5")
         self.effort = cfg.get("effort", {})
         # 작업별 모델: 헤드라인 풀이는 더 싼 모델을 쓸 수 있다
@@ -111,9 +143,15 @@ class Analyst:
     def _json(self, system: str, payload: dict, schema: dict, effort_key: str) -> dict | None:
         """한 번 호출해 JSON 을 돌려준다. 거절·잘림이면 None, 더 못 부르는 상황이면 LLMUnavailable."""
         user = "<data>\n" + json.dumps(payload, ensure_ascii=False) + "\n</data>"
+        model, max_tokens = self.models.get(effort_key, self.model), MAX_TOKENS.get(effort_key, 4000)
+        p_in, p_out = PRICES.get(model, UNKNOWN_PRICE)
+        if self.ledger:   # 최악의 경우(입력 전부 + 출력 최대)에도 예산을 넘지 않을 때만 호출한다
+            worst = (len(system) + len(user)) / 2.0 / 1e6 * p_in + max_tokens / 1e6 * p_out
+            if self.ledger.spent + worst > self.ledger.budget:
+                raise LLMUnavailable(f"AI 분석 예산 ${self.ledger.budget:.2f} 중 ${self.ledger.spent:.2f} 를 써서 더 호출하지 않습니다.")
         try:
             resp = self._create(
-                model=self.models.get(effort_key, self.model), max_tokens=16000, system=system,
+                model=model, max_tokens=max_tokens, system=system,
                 messages=[{"role": "user", "content": user}],
                 output_config={"effort": self.effort.get(effort_key, "low"), "format": {"type": "json_schema", "schema": schema}},
             )
@@ -132,6 +170,8 @@ class Analyst:
             raise LLMUnavailable("Claude API 연결 실패") from e
 
         self.calls += 1
+        if self.ledger:
+            self.ledger.add((resp.usage.input_tokens * p_in + resp.usage.output_tokens * p_out) / 1e6)
         self.usage["input"] += resp.usage.input_tokens
         self.usage["output"] += resp.usage.output_tokens
         if resp.stop_reason in ("refusal", "max_tokens"):
