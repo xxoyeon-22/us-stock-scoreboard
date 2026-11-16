@@ -1,0 +1,19 @@
+# 국내 증권사에서 미국 주식을 살 때 드는 비용 계산용.
+# !! 아래 요율은 "일반적으로 알려진 표준(이벤트 미적용) 수준"을 넣은 기본값이며 증권사 공지로 확인하지 못했다.
+# !! 증권사는 신규·휴면 고객 이벤트로 수수료와 환율 우대를 자주 바꾼다. 본인 계좌의 실제 요율로 고쳐 쓴다.
+#    commission_pct: 온라인 매매 수수료 (거래금액 대비 %, 매수·매도 각각)
+#    fx_spread_pct:  환전 스프레드 (매매기준율 대비 %, 살 때·팔 때 각각)
+#    fx_discount_pct: 환율 우대율 (%, 스프레드를 이만큼 깎아 준다)
+
+checked: null            # 직접 확인한 날짜를 적는다 (예: 2026-11-20)
+verified: false
+
+sec_fee_note: "매도할 때는 미국 SEC 수수료 등 소액의 제비용이 추가로 붙습니다."
+tax_note: "해외주식 양도차익은 연 250만원 공제 후 22% 과세이며 다음 해 5월에 직접 신고합니다."
+
+brokers:
+  - {id: mirae, name: 미래에셋증권, commission_pct: 0.25, fx_spread_pct: 1.0, fx_discount_pct: 0, url: "https://securities.miraeasset.com"}
+  - {id: kis, name: 한국투자증권, commission_pct: 0.25, fx_spread_pct: 1.0, fx_discount_pct: 0, url: "https://securities.koreainvestment.com"}
+  - {id: nh, name: NH투자증권, commission_pct: 0.25, fx_spread_pct: 1.0, fx_discount_pct: 0, url: "https://www.nhqv.com"}
+  - {id: samsung, name: 삼성증권, commission_pct: 0.25, fx_spread_pct: 1.0, fx_discount_pct: 0, url: "https://www.samsungpop.com"}
+  - {id: kb, name: KB증권, commission_pct: 0.25, fx_spread_pct: 1.0, fx_discount_pct: 0, url: "https://www.kbsec.com"}

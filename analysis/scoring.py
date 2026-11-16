@@ -50,8 +50,13 @@ def _metric_percentiles(stocks: list[dict], name: str, spec: dict, min_group: in
     return out
 
 
-def score_universe(stocks: list[dict], weights: dict) -> list[dict]:
-    """stocks: [{symbol, sector, metrics: {지표명: 값|None}}] → 점수가 붙은 목록 (점수 내림차순)."""
+def score_universe(stocks: list[dict], weights: dict, extras: dict | None = None) -> list[dict]:
+    """stocks: [{symbol, sector, metrics: {지표명: 값|None}}] → 점수가 붙은 목록 (점수 내림차순).
+
+    extras: 지표 백분위가 아니라 이미 0~100 으로 계산된 구성 요소.
+            {구성요소id: {티커: {"score": float, "detail": ...}}} (투자자 포지션, 뉴스 감성)
+    """
+    extras = extras or {}
     min_group = weights.get("min_group_size", 5)
     regime = weights.get("regime", {})
     coef = max(regime.get("min", 0.8), min(regime.get("max", 1.1), regime.get("current", 1.0)))
@@ -72,10 +77,15 @@ def score_universe(stocks: list[dict], weights: dict) -> list[dict]:
                 p = pct[name].get(s["symbol"])
                 if value is not None and p is not None:
                     metrics[name] = {"value": round(value, 3), "pct": round(p, 1)}
-            if not metrics:
+            ext = extras.get(comp_id, {}).get(s["symbol"])
+            if metrics:
+                comp_score = sum(m["pct"] for m in metrics.values()) / len(metrics)
+                components[comp_id] = {"score": round(comp_score, 1), "metrics": metrics}
+            elif ext is not None:
+                comp_score = float(ext["score"])
+                components[comp_id] = {"score": round(comp_score, 1), "metrics": {}, "detail": ext.get("detail")}
+            else:
                 continue
-            comp_score = sum(m["pct"] for m in metrics.values()) / len(metrics)
-            components[comp_id] = {"score": round(comp_score, 1), "metrics": metrics}
             weighted += comp["weight"] * comp_score
             weight_sum += comp["weight"]
 

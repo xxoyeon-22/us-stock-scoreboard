@@ -3,101 +3,217 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>미국 주식 스코어보드</title>
+<meta name="color-scheme" content="dark">
+<title>US/SCOREBOARD — 미국 주식 스코어보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="top">
   <div class="brand">
-    <h1>미국 주식 스코어보드</h1>
-    <span id="market" class="pill">—</span>
-    <span id="live" class="pill off" title="실시간 시세 연결 상태">실시간 꺼짐</span>
+    <span class="mark" aria-hidden="true"><i class="u"></i><i class="d"></i></span>
+    <span class="logo">US/SCOREBOARD</span>
   </div>
   <nav class="tabs" role="tablist">
     <button data-tab="rank" class="on" role="tab">추천 순위</button>
-    <button data-tab="news" role="tab">실시간 이슈 <span id="newsBadge" class="badge" hidden></span></button>
+    <button data-tab="tonight" role="tab">오늘 밤</button>
+    <button data-tab="mypage" role="tab">내 주식</button>
+    <button data-tab="investors" role="tab">투자자</button>
+    <button data-tab="news" role="tab">뉴스 <span id="newsBadge" class="badge" hidden></span></button>
+    <button data-tab="calendar" role="tab">일정</button>
+    <button data-tab="fees" role="tab">수수료</button>
     <button data-tab="settings" role="tab">설정</button>
   </nav>
+  <div class="status">
+    <span id="market" class="chip">—</span>
+    <span id="live" class="chip live off"><i aria-hidden="true"></i><b>OFF</b></span>
+  </div>
 </header>
 
-<div id="sampleBanner" class="banner warn" hidden>
-  지금 보이는 점수와 주가는 <b>화면 확인용 샘플(가짜 값)</b>입니다. 데이터 수집이 한 번 돌면 실제 값으로 바뀝니다.
-</div>
-<div id="keyBanner" class="banner" hidden>
-  실시간 주가를 보려면 <a href="#" data-goto="settings">설정</a>에서 Finnhub API 키를 넣으세요. 지금은 마지막 수집 시점의 가격입니다.
-</div>
+<div id="sampleBanner" class="banner solid" hidden>샘플 데이터 · 지금 보이는 점수와 주가는 화면 확인용 가짜 값입니다. 데이터 수집이 한 번 돌면 실제 값으로 바뀝니다.</div>
+<div id="keyBanner" class="banner" hidden>실시간 주가를 보려면 <a href="#" data-goto="settings">설정</a>에서 Finnhub API 키를 넣으세요. 지금은 마지막 수집 시점의 가격입니다.</div>
+
+<section class="strip" id="strip"></section>
 
 <main>
+  <!-- 추천 순위 -->
   <section id="tab-rank">
+    <div class="head">
+      <div><div class="eyebrow">RANKING · 섹터 내 백분위</div><h1>추천 순위</h1></div>
+      <span id="stamp" class="mono dim"></span>
+    </div>
+    <div id="concWarn" class="warn" hidden></div>
     <div class="toolbar">
-      <input id="q" type="search" placeholder="티커·회사명 검색" autocomplete="off">
-      <select id="sector"><option value="">전체 섹터</option></select>
-      <span class="spacer"></span>
-      <span id="stamp" class="muted small"></span>
+      <label class="search"><span>검색</span><input id="q" type="search" placeholder="티커 · 회사명" autocomplete="off"></label>
+      <select id="sector" aria-label="섹터"><option value="">전체 섹터</option></select>
+      <select id="outlookFilter" aria-label="전망">
+        <option value="">전체 전망</option><option value="up">상승 전망만</option><option value="down">하락 전망만</option>
+      </select>
+      <label class="check"><input type="checkbox" id="hideIlliquid"> 거래대금 적은 종목 숨김</label>
     </div>
     <div class="tablewrap">
       <table id="rank">
         <thead><tr>
-          <th class="num">#</th><th>종목</th><th class="hide-s">섹터</th>
-          <th class="num">점수</th><th class="num">전일 대비</th>
-          <th class="num hide-s">펀더멘털</th><th class="num hide-s">밸류에이션</th>
-          <th class="num">주가</th><th class="num">등락률</th>
+          <th class="c-rank">#</th><th>종목</th><th class="hide-m">섹터</th><th>점수</th>
+          <th class="r">전일 대비</th><th>뉴스 전망</th><th class="hide-m">위험</th>
+          <th class="r">주가 (USD)</th><th class="r">등락률</th>
         </tr></thead>
         <tbody></tbody>
       </table>
-      <p id="empty" class="muted pad" hidden>표시할 종목이 없습니다.</p>
+      <p id="empty" class="empty" hidden>표시할 종목이 없습니다.</p>
     </div>
-    <div class="pager">
-      <button id="prev">이전</button><span id="pageinfo" class="muted small"></span><button id="next">다음</button>
+    <div class="foot">
+      <div class="legend">
+        <span><i class="sq u"></i>▲ 상승·호재</span><span><i class="sq d"></i>▼ 하락·악재</span>
+        <span id="scopeNote"></span>
+      </div>
+      <div class="pager"><button id="prev">이전</button><span id="pageinfo"></span><button id="next">다음</button></div>
     </div>
-    <p class="muted small note" id="scopeNote"></p>
   </section>
 
+  <!-- 오늘 밤 -->
+  <section id="tab-tonight" hidden>
+    <div class="head">
+      <div><div class="eyebrow" id="tonightOpen">TONIGHT</div><h1>오늘 밤 살펴볼 종목</h1></div>
+      <span id="tonightStamp" class="mono dim"></span>
+    </div>
+    <div class="warn" id="tonightNote"></div>
+    <div class="two">
+      <div>
+        <div class="col-head up-head"><h2>사면 좋을 종목 <span class="wt">TOP 5</span></h2><span class="tag fill up">▲ 매수 후보</span></div>
+        <div id="tonightBuy"></div>
+      </div>
+      <div>
+        <div class="col-head down-head"><h2>팔면 좋을 종목 <span class="wt">TOP 5</span></h2><span class="tag fill down">▼ 매도 후보</span></div>
+        <div id="tonightSell"></div>
+      </div>
+    </div>
+    <p class="note" id="tonightRule"></p>
+  </section>
+
+  <!-- 내 주식 -->
+  <section id="tab-mypage" hidden>
+    <div class="head">
+      <div><div class="eyebrow">MY PORTFOLIO · 이 브라우저에만 저장</div><h1>내 주식</h1></div>
+      <span id="mineStamp" class="mono dim"></span>
+    </div>
+    <div class="warn"><b>입력한 보유 내역은 이 브라우저에만 저장되고 서버나 GitHub 로 올라가지 않습니다.</b>
+      브라우저 데이터를 지우면 사라지니 ‘내보내기’로 백업해 두세요. 아래 판단은 참고용이며 매매 권유가 아닙니다.</div>
+    <div class="panel pad">
+      <h2>종목 추가·수정</h2>
+      <div class="row">
+        <input id="mineSym" type="text" placeholder="티커 (예: NVDA)" maxlength="8" autocomplete="off" spellcheck="false" aria-label="티커">
+        <input id="mineShares" type="text" inputmode="decimal" placeholder="수량 (주)" aria-label="수량">
+        <input id="mineAvg" type="text" inputmode="decimal" placeholder="평균 매수가 (USD)" aria-label="평균 매수가">
+        <button id="mineAdd" class="primary">추가 · 수정</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <input id="mineFx" type="text" inputmode="decimal" placeholder="환율 (원/달러) — 넣으면 원화도 표시" aria-label="환율">
+        <button id="mineExport">내보내기</button>
+        <label class="btn">가져오기<input id="mineImport" type="file" accept=".json,application/json" hidden></label>
+      </div>
+      <p id="mineMsg" class="small dim" style="margin:8px 0 0"></p>
+    </div>
+    <div id="mineBody"></div>
+  </section>
+
+  <!-- 투자자 -->
+  <section id="tab-investors" hidden>
+    <div class="head">
+      <div><div class="eyebrow">13F · 분기 말 기준, 최대 45일 지연, 매수 포지션만 공개</div><h1>유명 투자자</h1></div>
+      <span id="invStamp" class="mono dim"></span>
+    </div>
+    <div class="split">
+      <aside class="panel list" id="invList"></aside>
+      <div class="grow" id="invDetail"></div>
+    </div>
+  </section>
+
+  <!-- 뉴스 -->
   <section id="tab-news" hidden>
-    <div class="toolbar">
-      <select id="newsSource"><option value="">전체 언론사</option></select>
-      <label class="check"><input type="checkbox" id="newsTagged"> 종목이 인식된 기사만</label>
-      <span class="spacer"></span>
-      <span id="newsStamp" class="muted small"></span>
+    <div class="head">
+      <div><div class="eyebrow">LIVE FEED · 헤드라인과 원문 링크만 제공</div><h1>뉴스 정리</h1></div>
+      <span id="newsStamp" class="mono dim"></span>
     </div>
-    <ul id="newsList" class="news"></ul>
+    <div class="toolbar">
+      <select id="newsSource" aria-label="언론사"><option value="">전체 언론사</option></select>
+      <select id="newsSent" aria-label="호재 여부">
+        <option value="">호재·악재 전체</option><option value="positive">호재만</option><option value="negative">악재만</option><option value="neutral">중립만</option>
+      </select>
+      <select id="newsEvent" aria-label="사건 유형"><option value="">전체 유형</option></select>
+      <label class="check"><input type="checkbox" id="newsTagged"> 종목이 인식된 기사만</label>
+    </div>
+    <div id="newsSummary" class="strip inner"></div>
+    <ul id="newsList" class="news panel"></ul>
   </section>
 
+  <!-- 일정 -->
+  <section id="tab-calendar" hidden>
+    <div class="head">
+      <div><div class="eyebrow">EVENTS · 발표 직전 매수는 변동성이 큽니다</div><h1>일정</h1></div>
+      <span id="calStamp" class="mono dim"></span>
+    </div>
+    <div id="calBody"></div>
+  </section>
+
+  <!-- 수수료 -->
+  <section id="tab-fees" hidden>
+    <div class="head">
+      <div><div class="eyebrow">COST · 국내 증권사에서 미국 주식을 살 때</div><h1>수수료 계산</h1></div>
+    </div>
+    <div id="feeWarn" class="warn"></div>
+    <div class="toolbar">
+      <label class="search"><span>매수 금액 (원)</span><input id="feeAmount" type="text" inputmode="numeric" value="1,000,000"></label>
+      <label class="search"><span>환율 (원/달러)</span><input id="feeRate" type="text" inputmode="decimal" placeholder="직접 입력"></label>
+      <button id="feeReset">기본값으로</button>
+    </div>
+    <div class="tablewrap">
+      <table id="fees">
+        <thead><tr>
+          <th>증권사</th><th class="r">매매 수수료 %</th><th class="r">환전 스프레드 %</th><th class="r">환율 우대 %</th>
+          <th class="r">환전 비용</th><th class="r">매수 수수료</th><th class="r">살 때 합계</th><th class="r">사고팔 때 합계</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="note" id="feeNote"></p>
+  </section>
+
+  <!-- 설정 -->
   <section id="tab-settings" hidden>
-    <div class="card">
+    <div class="head"><div><div class="eyebrow">SETTINGS</div><h1>설정</h1></div></div>
+    <div class="panel pad">
       <h2>실시간 시세 (Finnhub API 키)</h2>
-      <p class="muted">키는 <b>이 브라우저에만</b> 저장되고(localStorage) finnhub.io 로만 전송됩니다. 저장소나 이 사이트 서버에는 올라가지 않습니다.
+      <p class="dim">키는 <b>이 브라우저에만</b> 저장되고 finnhub.io 로만 전송됩니다. 저장소나 이 사이트에는 올라가지 않습니다.
         무료 키는 <a href="https://finnhub.io/register" target="_blank" rel="noopener">finnhub.io</a> 에서 발급받습니다.</p>
       <div class="row">
         <input id="key" type="password" placeholder="Finnhub API 키" autocomplete="off" spellcheck="false">
-        <button id="saveKey" class="primary">저장</button>
-        <button id="clearKey">지우기</button>
+        <button id="saveKey" class="primary">저장</button><button id="clearKey">지우기</button>
       </div>
-      <p id="keyStatus" class="small muted"></p>
+      <p id="keyStatus" class="dim small"></p>
     </div>
-    <div class="card">
+    <div class="panel pad">
       <h2>갱신 주기</h2>
       <ul class="plain">
-        <li><b>주가</b> — 키가 있으면 화면에 보이는 종목(최대 50개)의 체결가를 웹소켓으로 즉시 반영</li>
-        <li><b>이슈(뉴스)</b> — 키가 있으면 1분마다 브라우저가 직접 새 헤드라인 확인, 없으면 약 10분마다 수집본 갱신</li>
-        <li><b>점수</b> — 미국 장 마감 후 하루 1회 재계산</li>
+        <li><b>주가</b> — 키가 있으면 화면에 보이는 종목(최대 50개)의 체결가를 즉시 반영</li>
+        <li><b>뉴스</b> — 키가 있으면 1분마다 직접 확인, 수집본은 약 10분마다 갱신</li>
+        <li><b>쉬운 설명·전망</b> — 새 뉴스가 붙은 종목만 다시 분석 (수집 주기와 같음)</li>
+        <li><b>점수·투자자 13F·실적 일정</b> — 미국 장 마감 후 하루 1회</li>
       </ul>
     </div>
-    <div class="card">
-      <h2>점수 구성</h2>
-      <div id="weights"></div>
-    </div>
+    <div class="panel pad"><h2>점수 구성</h2><div id="weights"></div></div>
   </section>
 </main>
 
 <aside id="drawer" class="drawer" hidden aria-label="종목 상세">
-  <button id="closeDrawer" class="close" aria-label="닫기">×</button>
   <div id="detail"></div>
 </aside>
 <div id="scrim" class="scrim" hidden></div>
 
 <footer>
-  투자 판단의 책임은 본인에게 있으며, 본 정보는 투자 권유가 아닙니다. 점수는 공개 데이터를 기계적으로 계산한 값이고 지연·오류가 있을 수 있습니다.
+  투자 판단의 책임은 본인에게 있으며, 본 정보는 투자 권유가 아닙니다. 점수와 전망은 공개 데이터와 뉴스 동향을 기계적으로 처리한 값이고 지연·오류가 있을 수 있습니다.
 </footer>
 <script src="app.js"></script>
 </body>

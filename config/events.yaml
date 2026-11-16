@@ -1,0 +1,7 @@
+# 거시 이벤트 일정 (FOMC, CPI 등). 날짜를 자동으로 받는 무료 출처가 없어 직접 적는다.
+# 실적 발표일은 Finnhub 에서 자동으로 받는다 (earnings_days_ahead 일 앞까지).
+# 형식: - {date: "2026-12-09", title: "FOMC 금리 결정", type: fomc}   type: fomc | cpi | jobs | other
+
+earnings_days_ahead: 30
+
+events: []

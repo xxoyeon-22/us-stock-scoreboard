@@ -2,14 +2,14 @@ name: 데이터 갱신 + 사이트 배포
 
 on:
   schedule:
-    - cron: "*/10 * * * *"      # 뉴스: 10분마다 (GitHub 사정으로 몇 분~수십 분 늦어질 수 있음)
-    - cron: "30 21 * * 1-5"     # 점수: 평일 21:30 UTC (미국 장 마감 후)
+    - cron: "*/10 * * * *"      # 뉴스·분석: 10분마다 (GitHub 사정으로 몇 분~수십 분 늦어질 수 있음)
+    - cron: "30 21 * * 1-5"     # 재무·13F·실적 일정: 평일 21:30 UTC (미국 장 마감 후)
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
       scores:
-        description: 점수도 다시 계산 (S&P 500 전체, 약 35분)
+        description: 재무·13F도 다시 수집 (S&P 500 전체, 약 35분)
         type: boolean
         default: false
 
@@ -23,7 +23,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -46,9 +46,11 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: 수집 + 점수 계산
+      - name: 수집 + 분석 + 점수 계산
         env:
-          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}        # 재무·시세·실적 일정
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}    # 쉬운 설명·호재 판단·전망 (없으면 건너뜀)
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}          # 13F (예: "my-app name@example.com", 없으면 건너뜀)
           RUN_SCORES: ${{ (github.event.schedule == '30 21 * * 1-5' || inputs.scores == true) && '1' || '0' }}
         run: python pipeline.py auto
 

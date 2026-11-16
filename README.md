@@ -1,42 +1,73 @@
-# 미국 주식 스코어보드
+# US/SCOREBOARD — 미국 주식 스코어보드
 
 S&P 500 종목에 종합 점수(0~100)와 근거를 보여주는 판단 보조 도구.
 GitHub Pages(정적 사이트) + GitHub Actions(데이터 수집)로 돌아가며 서버가 없다.
 
 > 투자 판단의 책임은 본인에게 있으며, 본 정보는 투자 권유가 아니다.
 
-## 지금 구현된 범위 (기획서 1단계 + 실시간 화면)
+## 화면
 
-| 항목 | 상태 |
-|------|------|
-| 펀더멘털·밸류에이션 점수 (섹터 내 백분위) | 구현 |
-| 실시간 주가 (브라우저 → Finnhub 웹소켓) | 구현 |
-| 뉴스 헤드라인 수집 (RSS 8곳 + Finnhub), 종목 매핑, 중복 묶기 | 구현 |
-| 투자자 13F / 수급 / 뉴스 감성(Claude) / 시장 국면 / 백테스트 | 다음 단계 — 점수에서 제외하고 가중치 재분배 |
+| 탭 | 내용 |
+|----|------|
+| 추천 순위 | 점수, 전일 대비, 뉴스 전망, 위험, 실시간 주가. 상위 종목 섹터 편중 경고, 거래대금 필터 |
+| 오늘 밤 | 매수 후보 5개·매도 후보 5개. 종합 점수 + 뉴스 전망 가감점, 업종당 최대 2개, 거래대금 적은 종목 제외 |
+| 내 주식 | 보유 종목·수량·평균 매수가를 직접 입력해 평가손익을 보고, 유명 투자자 경향·점수·뉴스를 합쳐 ‘계속 보유 우호 / 중립 / 비중 축소 검토’ 의견을 표시. 입력값은 그 브라우저에만 저장 |
+| 종목 상세 | 쉬운 설명·호재 여부·방향 전망(Claude), 위험·타이밍, 요인별 점수, 보유 투자자, 최근 뉴스 |
+| 투자자 | 유명 투자자 10명의 13F 포트폴리오, 직전 분기 대비 변화, 관련 뉴스·발언 요약 |
+| 뉴스 | 언론사 8곳 헤드라인, 한국어 한 줄 풀이, 호재/악재·사건 유형 필터 |
+| 일정 | 실적 발표일(자동), FOMC·CPI 등 거시 일정(직접 입력) |
+| 수수료 | 국내 5개 증권사 기준 환전 비용·매매 수수료 계산기 |
+
+## 점수 구성 (config/weights.yaml)
+
+| 구성 요소 | 가중치 | 입력 |
+|-----------|--------|------|
+| 성장·수익성 | 25% | 매출·EPS 성장률, 영업이익률, 마진 추세, ROE, ROIC, 어닝 서프라이즈 |
+| 재무 건전성 | 10% | 부채비율, 이자보상배율, EV/FCF, 유동비율 |
+| 밸류에이션 | 15% | PER, Forward PER, PSR, EV/EBITDA |
+| 모멘텀·추세 | 10% | 13·26주 수익률, S&P 500 대비 상대 강도, 52주 범위 내 위치 |
+| 투자자 포지션 | 15% | 13F: 신규 > 확대 > 유지 > 축소 > 전량 매도, 비중·동시 매수 가산 |
+| 뉴스 감성 | 15% | Claude 가 최근 7일 헤드라인으로 매긴 감성 점수 |
+| 수급 | 10% | 미구현 — 제외하고 가중치 재분배 |
+
+가중치는 출발점으로 잡은 임의값이다. 지표는 같은 섹터 안 백분위로 정규화하고,
+자료가 없는 항목은 0점이 아니라 빼고 나머지 가중치를 다시 나눈다.
+베타·거래대금·52주 고점 대비는 점수에 넣지 않고 위험 표시로만 쓴다.
+
+## 필요한 키
+
+| 이름 | 용도 | 없으면 |
+|------|------|--------|
+| `FINNHUB_API_KEY` | 재무 지표, 시세, 실적 일정 ([finnhub.io](https://finnhub.io/register) 무료) | 점수가 샘플로 남는다 |
+| `ANTHROPIC_API_KEY` | 쉬운 설명, 호재 판단, 전망, 투자자 동향 요약 (사용량 과금) | 그 기능만 비어 있다 |
+| `SEC_USER_AGENT` | 13F 수집. SEC 가 연락처를 요구한다 (예: `my-app name@example.com`) | 투자자 탭이 갱신되지 않는다 |
+
+로컬은 `.env`, 배포는 GitHub 저장소의 **Settings → Secrets and variables → Actions** 에 같은 이름으로 넣는다.
+**비용**: Finnhub·SEC·GitHub 는 무료이고 Claude API 만 사용량만큼 과금된다.
+`config/settings.yaml` 의 `llm` 항목: 헤드라인 풀이는 `claude-haiku-5-5`, 종목 분석·투자자 요약은
+`claude-sonnet-5-5`. 하루 종목 분석 상한(`max_stocks_per_day: 20`)과 같은 종목 재분석 최소 간격(12시간)이
+비용 상한 역할을 한다. 더 줄이려면 `model` 도 `claude-haiku-5-5` 로 바꾼다. (실제 청구액은 측정하지 못한 추정이다. Claude 콘솔의 사용량 화면에서 확인한다.)
 
 ## 갱신 주기
 
 | 데이터 | 방식 | 지연 |
 |--------|------|------|
 | 주가 | 브라우저가 사용자 키로 Finnhub 웹소켓 구독 (화면에 보이는 50개) | 체결 즉시 |
-| 이슈(뉴스) | 키가 있으면 브라우저가 1분마다 직접 확인 + Actions 가 10분마다 RSS 수집 | 1분 / 10분 이상 |
-| 점수 | Actions 가 평일 21:30 UTC(미국 장 마감 후)에 재계산 | 하루 1회 |
+| 뉴스 | 키가 있으면 브라우저가 1분마다 직접 확인 + Actions 가 10분마다 수집 | 1분 / 10분 이상 |
+| 쉬운 설명·전망 | 뉴스 수집 때 새 뉴스가 붙은 종목만 | 10분 이상 |
+| 점수·13F·실적 일정 | 평일 21:30 UTC (미국 장 마감 후) | 하루 1회 |
 
-GitHub Actions 의 예약 실행은 정시가 보장되지 않아 몇 분에서 수십 분 늦을 수 있다.
-그래서 "바로바로"가 필요한 주가와 이슈는 브라우저가 직접 받도록 했다.
+GitHub Actions 예약 실행은 정시가 보장되지 않아 몇 분에서 수십 분 늦을 수 있다.
 
 ## 배포 (GitHub)
 
-1. GitHub 에 **공개(public)** 저장소를 만들고 이 폴더를 `main` 브랜치로 올린다.
-   (비공개 저장소는 무료 플랜에서 Pages 를 쓸 수 없고, 10분 주기 실행이 Actions 무료 시간을 다 쓴다.)
-2. 저장소 **Settings → Secrets and variables → Actions → New repository secret**
-   이름 `FINNHUB_API_KEY`, 값은 [finnhub.io](https://finnhub.io/register) 에서 받은 무료 키.
-3. 올리면 워크플로가 자동으로 돌아 `gh-pages` 브랜치를 만든다. 첫 실행은 S&P 500 전체를 수집하므로 약 35분 걸린다.
-4. **Settings → Pages → Source: Deploy from a branch → `gh-pages` / `(root)`** 로 지정한다.
-5. 사이트를 열고 **설정** 탭에 같은 Finnhub 키를 넣으면 실시간 주가가 켜진다.
-   키는 그 브라우저에만 저장되고 저장소나 사이트에는 올라가지 않는다.
+1. **공개** 저장소의 `main` 에 올린다. (비공개는 무료 플랜에서 Pages 를 쓸 수 없고 Actions 시간도 부족하다)
+2. 위 표의 키 세 개를 저장소 Secret 으로 등록한다.
+3. 워크플로가 돌면 `gh-pages` 브랜치가 생긴다. 첫 실행은 S&P 500 전체 수집으로 약 35분.
+4. **Settings → Pages → Deploy from a branch → `gh-pages` / `(root)`**.
+5. 사이트의 설정 탭에 Finnhub 키를 넣으면 실시간 주가가 켜진다 (그 브라우저에만 저장).
 
-참고: 공개 저장소에서 60일간 커밋이 없으면 GitHub 가 예약 실행을 꺼 버린다. Actions 탭에서 다시 켜면 된다.
+공개 저장소에서 60일간 커밋이 없으면 GitHub 가 예약 실행을 끈다. Actions 탭에서 다시 켠다.
 
 ## 로컬 실행
 
@@ -52,20 +83,15 @@ python pipeline.py sample
 python -m http.server 8765 --directory web
 ```
 
-실제 데이터로 돌리려면 `.env.example` 을 `.env` 로 복사해 키를 넣은 뒤:
+실제 데이터 (`.env.example` 을 `.env` 로 복사해 키를 넣은 뒤):
 
 ```bash
-python pipeline.py news
+python pipeline.py auto
 ```
 
-```bash
-python pipeline.py scores --limit 20
-```
-
-`scores` 는 끝에 지표별 데이터 보유 종목 수를 출력한다. 어떤 지표가 0 이면
-`config/weights.yaml` 의 `keys`(Finnhub 필드 이름)를 고친다.
-
-테스트:
+개별 명령: `news`, `scores [--limit N]`, `investors`, `analyze`, `calendar`, `rescore`.
+`scores` 는 끝에 지표별 자료 보유 종목 수를 출력한다. 0 인 지표는 `config/weights.yaml` 의
+`keys`(Finnhub 필드 이름)를 고친다.
 
 ```bash
 python -m unittest discover -s tests -t .
@@ -74,27 +100,31 @@ python -m unittest discover -s tests -t .
 ## 구조
 
 ```
-collectors/   finnhub.py(시세·재무), news.py(RSS·매핑·중복 제거), universe.py(S&P 500 목록)
-analysis/     scoring.py (백분위 정규화, 가중 평균, 결측 재분배, 국면 계수)
-config/       weights.yaml, media.yaml, investors.yaml, settings.yaml
-pipeline.py   news | scores | auto | sample
+collectors/   finnhub.py, news.py(RSS·종목 매핑·중복 제거), sec13f.py(13F·CUSIP 매핑), universe.py
+analysis/     scoring.py(백분위·가중 평균), investors.py(13F 신호), llm.py(Claude 분석)
+config/       weights, media, investors, brokers, events, settings (.yaml)
+pipeline.py   명령 진입점
 web/          index.html, app.js, style.css, data/*.json (수집 결과)
 tests/
 .github/workflows/update.yml
 ```
 
-기획서와 다른 점: 서버가 없는 GitHub Pages 배포라 DB·백엔드 API 대신 `web/data/*.json` 을 저장소로 쓴다.
-백테스트(6단계)에 과거 점수가 필요해지면 그때 일별 스냅샷 저장을 추가한다.
+서버가 없는 배포라 DB·백엔드 API 대신 `web/data/*.json` 을 저장소로 쓴다.
 
-## 설정 바꾸기
+## 아직 없는 것
 
-- 점수 가중치·지표: `config/weights.yaml` (가중치는 출발점으로 잡은 임의값)
-- 언론사 RSS: `config/media.yaml` (막힌 피드는 `enabled: false`)
-- 투자자·CIK: `config/investors.yaml` (2단계에서 사용, CIK 는 EDGAR 에서 재확인 필요)
+- 경쟁 우위(해자): 10-K 사업·리스크 설명을 Claude 로 요약
+- 주식 희석: SBC·유상증자에 따른 주식 수 변화 (SEC XBRL 필요)
+- 애널리스트 EPS 추정치 변화 (Finnhub 유료 자료)
+- 50일·200일 이동평균, 최대 낙폭(MDD), 종목 간 상관관계 (일별 주가 이력이 필요한데 Finnhub 무료 플랜 밖)
+- 수급(Form 4 내부자 거래, 자사주 매입), 시장 국면 보정(FRED), 백테스트
+- 거시 일정 자동 수집 — 지금은 `config/events.yaml` 에 직접 적는다
 
 ## 알아 둘 한계
 
-- 뉴스는 헤드라인·요약·원문 링크만 저장한다. 유료 본문은 수집하지 않는다.
-- 헤드라인 → 종목 매핑은 회사명 일치 방식이라 누락·오탐이 있다.
-- 장 상태 표시는 미국 공휴일을 반영하지 않는다.
-- 다른 사람에게 공개하거나 유료로 제공하면 한국에서는 유사투자자문업 신고 등 규제 대상이 될 수 있다. 공개 전 전문가 확인이 필요하다.
+- **전망은 예측이 아니다.** 헤드라인과 요약만 보고 만든 추정이며 기사 본문은 읽지 않는다. 화면에도 참고용이라고 표시한다.
+- **13F** 는 분기 말 기준, 최대 45일 지연, 매수 포지션만 공개된다. 이미 팔았을 수 있다. 옵션 행은 점수에서 뺀다.
+- **증권사 수수료** 기본값은 이벤트를 적용하지 않은 일반적 표준 수준을 넣은 것이며 각 사 공지로 확인하지 못했다. `config/brokers.yaml` 이나 화면의 표에서 본인 요율로 고쳐 쓴다.
+- 헤드라인 → 종목 매핑은 회사명 일치 방식이라 누락·오탐이 있다. 장 상태 표시는 미국 공휴일을 반영하지 않는다.
+- 투자자 관련 뉴스는 이름 검색 결과라 동명이인이나 무관한 기사가 섞일 수 있다.
+- 다른 사람에게 공개하거나 유료로 제공하면 한국에서는 유사투자자문업 신고 등 규제 대상이 될 수 있다. 종목별 방향 전망을 보여주는 만큼 공개 전 전문가 확인이 필요하다.

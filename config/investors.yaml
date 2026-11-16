@@ -1,18 +1,29 @@
-# 유명 투자자 목록 (2단계 SEC 13F 수집용). 아직 코드에서 쓰지 않는다.
-# CIK 는 2단계 구현 시 EDGAR 에서 반드시 다시 확인한다 (기억에 의존해 적은 값).
+# 유명 투자자 목록. SEC 13F 는 cik 로 조회한다.
 # weight: 13F 신호의 신뢰도 (멀티 전략 펀드는 종목 수가 많아 낮춘다).
+# keywords: 관련 뉴스·발언 헤드라인을 찾을 때 쓰는 검색어.
+
+top_holdings: 30          # 화면에 보여줄 보유 종목 수
+map_top: 60               # CUSIP → 티커 매핑을 시도할 상위 종목 수
+change_threshold: 0.05    # 주식 수가 이 비율 이상 변해야 확대/축소로 본다
+news_per_investor: 12
+news_search:              # 투자자 이름으로 헤드라인 검색 (제목·링크만 저장)
+  enabled: true
+  url: "https://news.google.com/rss/search?q={query}+when:14d&hl=en-US&gl=US&ceid=US:en"
+
+action_scores: {new: 100, add: 80, hold: 60, trim: 35, exit: 10}
+consensus_bonus: 5        # 같은 분기에 매수(신규·확대)한 투자자가 한 명 늘 때마다
 
 investors:
-  - {id: buffett,       name: 워런 버핏,           fund: Berkshire Hathaway,       cik: "0001067983", weight: 1.0, enabled: true}
-  - {id: ackman,        name: 빌 애크먼,           fund: Pershing Square,          cik: "0001336528", weight: 1.0, enabled: true}
-  - {id: druckenmiller, name: 스탠리 드러켄밀러,   fund: Duquesne Family Office,   cik: "0001536411", weight: 1.0, enabled: true}
-  - {id: tepper,        name: 데이비드 테퍼,       fund: Appaloosa Management,     cik: "0001656456", weight: 1.0, enabled: true}
-  - {id: dalio,         name: 레이 달리오,         fund: Bridgewater Associates,   cik: "0001350694", weight: 0.6, enabled: true}
-  - {id: wood,          name: 캐시 우드,           fund: ARK Invest,               cik: "0001697748", weight: 0.8, enabled: true}
-  - {id: klarman,       name: 세스 클라만,         fund: Baupost Group,            cik: "0001061768", weight: 1.0, enabled: true}
-  - {id: marks,         name: 하워드 막스,         fund: Oaktree Capital,          cik: "0000949509", weight: 0.6, enabled: true}
-  - {id: griffin,       name: 켄 그리핀,           fund: Citadel Advisors,         cik: "0001423053", weight: 0.3, enabled: true}
-  # 버리는 2025년 말 등록 해제로 신규 13F 가 없을 수 있다 → 확인 후 아래 대체 후보 중 하나를 켠다.
-  - {id: burry,         name: 마이클 버리,         fund: Scion Asset Management,   cik: "0001649339", weight: 0.8, enabled: false}
-  - {id: loeb,          name: 댄 로브,             fund: Third Point,              cik: "0001040273", weight: 1.0, enabled: true}
-  - {id: coleman,       name: 체이스 콜먼,         fund: Tiger Global,             cik: "0001167483", weight: 0.8, enabled: false}
+  - {id: buffett, name: 워런 버핏, name_en: Warren Buffett, fund: Berkshire Hathaway, style: "가치투자 · 장기 보유", cik: "0001067983", weight: 1.0, enabled: true, keywords: ["Warren Buffett", "Berkshire Hathaway"]}
+  - {id: ackman, name: 빌 애크먼, name_en: Bill Ackman, fund: Pershing Square, style: "소수 종목 집중 · 행동주의", cik: "0001336528", weight: 1.0, enabled: true, keywords: ["Bill Ackman", "Pershing Square"]}
+  - {id: druckenmiller, name: 스탠리 드러켄밀러, name_en: Stanley Druckenmiller, fund: Duquesne Family Office, style: "매크로 + 성장주", cik: "0001536411", weight: 1.0, enabled: true, keywords: ["Druckenmiller", "Duquesne Family Office"]}
+  - {id: tepper, name: 데이비드 테퍼, name_en: David Tepper, fund: Appaloosa Management, style: "역발상 · 저평가", cik: "0001656456", weight: 1.0, enabled: true, keywords: ["David Tepper", "Appaloosa Management"]}
+  - {id: dalio, name: 레이 달리오, name_en: Ray Dalio, fund: Bridgewater Associates, style: "글로벌 매크로 · 분산", cik: "0001350694", weight: 0.6, enabled: true, keywords: ["Ray Dalio", "Bridgewater Associates"]}
+  - {id: wood, name: 캐시 우드, name_en: Cathie Wood, fund: ARK Invest, style: "파괴적 혁신 성장주", cik: "0001697748", weight: 0.8, enabled: true, keywords: ["Cathie Wood", "ARK Invest"]}
+  - {id: klarman, name: 세스 클라만, name_en: Seth Klarman, fund: Baupost Group, style: "딥밸류 · 안전마진", cik: "0001061768", weight: 1.0, enabled: true, keywords: ["Seth Klarman", "Baupost"]}
+  - {id: marks, name: 하워드 막스, name_en: Howard Marks, fund: Oaktree Capital, style: "사이클 · 리스크 관리", cik: "0000949509", weight: 0.6, enabled: true, keywords: ["Howard Marks", "Oaktree Capital"]}
+  - {id: griffin, name: 켄 그리핀, name_en: Ken Griffin, fund: Citadel Advisors, style: "멀티 전략 헤지펀드", cik: "0001423053", weight: 0.3, enabled: true, keywords: ["Ken Griffin", "Citadel"]}
+  # 버리는 2025년 말 등록 해제로 신규 13F 가 없을 수 있다. 대신 로브를 기본으로 켜 둔다.
+  - {id: burry, name: 마이클 버리, name_en: Michael Burry, fund: Scion Asset Management, style: "역발상 · 공매도", cik: "0001649339", weight: 0.8, enabled: false, keywords: ["Michael Burry", "Scion Asset Management"]}
+  - {id: loeb, name: 댄 로브, name_en: Dan Loeb, fund: Third Point, style: "이벤트 드리븐 · 행동주의", cik: "0001040273", weight: 1.0, enabled: true, keywords: ["Dan Loeb", "Third Point"]}
+  - {id: coleman, name: 체이스 콜먼, name_en: Chase Coleman, fund: Tiger Global, style: "글로벌 성장주", cik: "0001167483", weight: 0.8, enabled: false, keywords: ["Chase Coleman", "Tiger Global"]}
