@@ -227,6 +227,26 @@ td.px.fu { box-shadow: inset 0 0 18px -4px var(--up-glow); } td.px.fd { box-shad
 @keyframes pulse { 50% { opacity: .45; box-shadow: 0 0 4px 0 var(--up-glow); } }
 @media (prefers-reduced-motion: reduce) { .chip.live.on i { animation: none; } }
 
+/* 반짝임 — 빛 줄기가 블록 위를 훑고 지나가고, 글로우가 숨 쉬듯 커졌다 작아진다 */
+.blk.up, .blk.down, .tag.fill.up, .tag.fill.down, button.tk.up, button.tk.down, .outlook .dir { position: relative; overflow: hidden; }
+.blk.up::after, .blk.down::after, .tag.fill.up::after, .tag.fill.down::after, button.tk.up::after, button.tk.down::after, .outlook.up .dir::after, .outlook.down .dir::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%; pointer-events: none; transform: skewX(-20deg);
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .7), transparent); animation: sweep 3.4s ease-in-out infinite; }
+.blk.up, .tag.fill.up, button.tk.up, .outlook.up .dir { animation: breatheUp 2.6s ease-in-out infinite; }
+.blk.down, .tag.fill.down, button.tk.down, .outlook.down .dir { animation: breatheDown 2.6s ease-in-out infinite; }
+@keyframes sweep { 0%, 50% { left: -70%; } 100% { left: 135%; } }
+@keyframes breatheUp { 0%, 100% { box-shadow: 0 0 14px -2px var(--up-glow); } 50% { box-shadow: 0 0 28px 2px var(--up-glow); } }
+@keyframes breatheDown { 0%, 100% { box-shadow: 0 0 14px -2px var(--down-glow); } 50% { box-shadow: 0 0 28px 2px var(--down-glow); } }
+/* 줄마다 시차를 줘서 한꺼번에 번쩍이지 않게 */
+tr:nth-child(3n+1) .blk::after, .pick:nth-child(3n+1) .blk::after, .news li:nth-child(3n+1) button.tk::after { animation-delay: .5s; }
+tr:nth-child(3n+2) .blk::after, .pick:nth-child(3n+2) .blk::after, .news li:nth-child(3n+2) button.tk::after { animation-delay: 1.3s; }
+tr:nth-child(3n) .blk::after, .pick:nth-child(3n) .blk::after, .news li:nth-child(3n) button.tk::after { animation-delay: 2.1s; }
+tr:nth-child(2n) .blk, .pick:nth-child(2n) .blk { animation-delay: .9s; }
+@media (prefers-reduced-motion: reduce) {
+  .blk.up, .blk.down, .tag.fill.up, .tag.fill.down, button.tk.up, button.tk.down, .outlook .dir { animation: none; }
+  .blk::after, .tag.fill::after, button.tk::after, .outlook .dir::after { animation: none; display: none; }
+}
+
 footer { border-top: 1px solid var(--line); padding: 16px 22px 28px; font-size: 12px; color: var(--dim); }
 @media (max-width: 760px) {
   .hide-m { display: none; } h1 { font-size: 24px; } main { padding: 18px 14px 28px; }
