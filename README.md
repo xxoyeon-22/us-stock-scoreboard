@@ -48,6 +48,22 @@ GitHub Pages(정적 사이트) + GitHub Actions(데이터 수집)로 돌아가�
 `claude-sonnet-5-5`. 하루 종목 분석 상한(`max_stocks_per_day: 20`)과 같은 종목 재분석 최소 간격(12시간)이
 비용 상한 역할을 한다. 더 줄이려면 `model` 도 `claude-haiku-5-5` 로 바꾼다. (실제 청구액은 측정하지 못한 추정이다. Claude 콘솔의 사용량 화면에서 확인한다.)
 
+## 로그인 (가벼운 잠금)
+
+`web/auth.json` 에 계정이 있으면 로그인해야 화면이 보이고, 관리자(admin)에게만 Claude 키·캡처 읽기 패널이 보인다.
+계정 추가: `python tools/users.py add 아이디 [--admin]` 실행 후 커밋·푸시. 비밀번호는 PBKDF2 해시로만 저장된다.
+
+**한계**: 정적 사이트라 서버 인증이 아니다. `auth.json` 이 공개돼 있어 해시를 가져가 오프라인으로 맞춰 볼 수 있고
+(숫자 4자리 같은 짧은 비밀번호는 몇 초 만에 풀린다), `data/*.json` 은 로그인 없이도 주소로 열린다.
+진짜 접근 통제가 필요하면 Cloudflare Access 같은 서버 쪽 로그인을 쓴다.
+관리자 서버 키(`ANTHROPIC_API_KEY`)는 GitHub Secret 에만 있고 사이트에는 들어가지 않으므로 방문자가 쓸 수 없다.
+
+## AI 비용 상한
+
+`config/settings.yaml` 의 `llm.budget_usd`(기본 $8)가 이 프로젝트의 누적 Claude 비용 상한이다. 호출 전에 최악의 비용을
+계산해 상한을 넘을 것 같으면 보내지 않고, 사용액은 `web/data/usage.json` 에 쌓인다. 콘솔(console.anthropic.com)의
+월 한도도 함께 걸어 두는 것이 가장 확실하다.
+
 ## 갱신 주기
 
 | 데이터 | 방식 | 지연 |
