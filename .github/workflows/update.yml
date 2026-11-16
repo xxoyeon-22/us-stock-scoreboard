@@ -1,0 +1,61 @@
+name: 데이터 갱신 + 사이트 배포
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"      # 뉴스: 10분마다 (GitHub 사정으로 몇 분~수십 분 늦어질 수 있음)
+    - cron: "30 21 * * 1-5"     # 점수: 평일 21:30 UTC (미국 장 마감 후)
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      scores:
+        description: 점수도 다시 계산 (S&P 500 전체, 약 35분)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 이전 데이터 가져오기 (gh-pages)
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: _prev
+
+      - name: 이전 데이터 복원
+        run: |
+          if [ -d _prev/data ]; then cp -r _prev/data/. web/data/; fi
+          rm -rf _prev
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: 수집 + 점수 계산
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          RUN_SCORES: ${{ (github.event.schedule == '30 21 * * 1-5' || inputs.scores == true) && '1' || '0' }}
+        run: python pipeline.py auto
+
+      - name: gh-pages 로 배포
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./web
+          force_orphan: true      # 10분마다 커밋이 쌓이지 않게 항상 한 개의 커밋만 유지
+          commit_message: 데이터 갱신
