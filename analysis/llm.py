@@ -164,6 +164,8 @@ class Analyst:
         except anthropic.APIStatusError as e:
             if e.status_code >= 500:
                 raise LLMUnavailable(f"Claude API 서버 오류 ({e.status_code})") from e
+            if "credit" in str(e.message).lower() or "billing" in str(e.message).lower():   # 크레딧 소진 — 더 불러도 계속 실패한다
+                raise LLMUnavailable("Claude 크레딧이 소진됐습니다. 충전 전까지 AI 분석을 건너뜁니다.") from e
             print(f"[llm] 요청 오류 ({e.status_code}): {e.message}")
             return None
         except anthropic.APIConnectionError as e:
