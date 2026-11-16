@@ -211,6 +211,8 @@ body.locked > *:not(#gate) { visibility: hidden; }
 .gate { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .gate-box { width: min(360px, 100%); border: 1px solid var(--line3); background: var(--panel); padding: 28px 26px 22px; box-shadow: 0 0 40px -12px var(--down-glow); }
 .gate-l { display: block; font-size: 12.5px; color: var(--dim); margin-bottom: 12px; } .gate-l input { display: block; width: 100%; margin-top: 4px; color: var(--text); }
+.linkbtn { border: 0; background: none; color: var(--text2); text-decoration: underline; min-height: 0; padding: 10px 0 0; width: 100%; text-align: center; }
+.gate-code { width: 100%; margin-top: 12px; background: var(--bg); color: var(--text2); border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; padding: 8px; resize: none; word-break: break-all; }
 body:not(.is-admin) .admin-only { display: none !important; }
 
 /* 투자 성향 */

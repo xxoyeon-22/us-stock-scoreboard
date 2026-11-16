@@ -2,6 +2,7 @@
 
   python tools/users.py add 아이디 --admin      관리자 계정 (비밀번호는 입력창에서 묻는다)
   python tools/users.py add 아이디              일반 계정
+  python tools/users.py approve 신청코드         로그인 화면 ‘가입 신청’으로 받은 코드를 승인 (일반 계정)
   python tools/users.py remove 아이디
   python tools/users.py list
 
@@ -54,6 +55,29 @@ def add_user(user_id: str, password: str, admin: bool) -> None:
     save(data)
 
 
+def approve(code: str) -> str:
+    """로그인 화면의 ‘신청 코드’를 승인해 일반 계정으로 추가한다 (관리자 권한은 줄 수 없다)."""
+    import base64
+    try:
+        req = json.loads(base64.b64decode(code.strip(), validate=True))
+    except Exception:
+        raise SystemExit("신청 코드를 읽을 수 없습니다. 처음부터 끝까지 그대로 붙여 넣었는지 확인하세요.")
+    data = load()
+    uid = str(req.get("id", "")).strip().lower()
+    salt, digest = str(req.get("salt", "")), str(req.get("hash", ""))
+    if not re.fullmatch(r"[a-z0-9_.-]{2,32}", uid):
+        raise SystemExit("신청 코드의 아이디 형식이 올바르지 않습니다.")
+    if not re.fullmatch(r"[0-9a-f]{32}", salt) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise SystemExit("신청 코드의 해시 형식이 올바르지 않습니다.")
+    if req.get("iterations") != data["iterations"]:
+        raise SystemExit("신청 코드의 반복 횟수가 이 사이트 설정과 다릅니다. 다시 신청하게 하세요.")
+    if any(u["id"] == uid for u in data["users"]):
+        raise SystemExit(f"이미 있는 아이디입니다: {uid}")
+    data["users"].append({"id": uid, "role": "user", "salt": salt, "hash": digest})
+    save(data)
+    return uid
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -61,6 +85,8 @@ def main() -> int:
     a.add_argument("id")
     a.add_argument("--admin", action="store_true")
     a.add_argument("--password")
+    ap = sub.add_parser("approve")
+    ap.add_argument("code")
     r = sub.add_parser("remove")
     r.add_argument("id")
     sub.add_parser("list")
@@ -69,6 +95,8 @@ def main() -> int:
         pw = args.password or getpass.getpass("비밀번호: ")
         add_user(args.id, pw, args.admin)
         print(f"{args.id.lower()} 계정을 {'관리자' if args.admin else '일반'}으로 저장했습니다.")
+    elif args.cmd == "approve":
+        print(f"{approve(args.code)} 계정을 일반 계정으로 승인했습니다. 커밋·푸시하면 로그인할 수 있습니다.")
     elif args.cmd == "remove":
         data = load()
         data["users"] = [u for u in data["users"] if u["id"] != args.id.lower()]

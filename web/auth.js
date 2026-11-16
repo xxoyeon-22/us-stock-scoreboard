@@ -28,6 +28,31 @@
   if (prev) return unlock(prev);
 
   $("#gate").hidden = false;
+  // 가입 신청: 브라우저에서 소금·해시를 만들어 ‘신청 코드’로 보여 준다. 관리자가 승인(tools/users.py approve)해야 계정이 생긴다.
+  const showSign = (on) => { $("#gateForm").hidden = on; $("#signForm").hidden = !on; };
+  $("#gateToSign").addEventListener("click", () => showSign(true));
+  $("#signBack").addEventListener("click", () => showSign(false));
+  $("#signForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = $("#signId").value.trim().toLowerCase(), pw = $("#signPw").value, msg = $("#signMsg");
+    if (!/^[a-z0-9_.-]{2,32}$/.test(id)) { msg.textContent = "아이디는 영문 소문자·숫자·_.- 2~32자로 만드세요."; return; }
+    if (users.some((u) => u.id === id)) { msg.textContent = "이미 있는 아이디입니다."; return; }
+    if (pw.length < 8) { msg.textContent = "비밀번호는 8자 이상으로 만드세요."; return; }
+    if (pw !== $("#signPw2").value) { msg.textContent = "비밀번호 확인이 다릅니다."; return; }
+    $("#signBtn").disabled = true; msg.textContent = "만드는 중…";
+    try {
+      const iterations = cfg.iterations || 200000, salt = hex(crypto.getRandomValues(new Uint8Array(16)));
+      const code = btoa(JSON.stringify({ v: 1, id, salt, hash: await derive(pw, salt, iterations), iterations }));
+      $("#signCode").value = code; $("#signCode").hidden = false; $("#signCopy").hidden = false;
+      $("#signPw").value = ""; $("#signPw2").value = "";
+      msg.textContent = "아래 코드를 관리자에게 보내세요. 승인되면 이 아이디와 비밀번호로 로그인할 수 있습니다.";
+    } catch { msg.textContent = "코드를 만들지 못했습니다 (https 또는 localhost 필요)."; }
+    $("#signBtn").disabled = false;
+  });
+  $("#signCopy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($("#signCode").value); $("#signMsg").textContent = "복사했습니다. 관리자에게 보내세요."; }
+    catch { $("#signCode").select(); $("#signMsg").textContent = "코드를 선택해 직접 복사하세요."; }
+  });
   let fails = 0;
   $("#gateForm").addEventListener("submit", async (e) => {
     e.preventDefault();
