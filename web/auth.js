@@ -43,15 +43,18 @@
     try {
       const iterations = cfg.iterations || 200000, salt = hex(crypto.getRandomValues(new Uint8Array(16)));
       const code = btoa(JSON.stringify({ v: 1, id, salt, hash: await derive(pw, salt, iterations), iterations }));
-      $("#signCode").value = code; $("#signCode").hidden = false; $("#signCopy").hidden = false;
+      $("#signCode").value = code; $("#signCode").hidden = false; $("#signCopy").hidden = false; $("#signKakao").hidden = false;
       $("#signPw").value = ""; $("#signPw2").value = "";
-      msg.textContent = "아래 코드를 관리자에게 보내세요. 승인되면 이 아이디와 비밀번호로 로그인할 수 있습니다.";
+      msg.textContent = "아래 노란 버튼을 누르면 코드가 복사되고 오픈채팅이 열립니다. 채팅에 붙여 넣어 보내면 관리자가 승인하고, 승인되면 이 아이디와 비밀번호로 로그인할 수 있습니다.";
     } catch { msg.textContent = "코드를 만들지 못했습니다 (https 또는 localhost 필요)."; }
     $("#signBtn").disabled = false;
   });
   $("#signCopy").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText($("#signCode").value); $("#signMsg").textContent = "복사했습니다. 관리자에게 보내세요."; }
     catch { $("#signCode").select(); $("#signMsg").textContent = "코드를 선택해 직접 복사하세요."; }
+  });
+  $("#signKakao").addEventListener("click", () => {      // 링크는 그대로 열리고, 그 전에 코드를 클립보드에 복사한다
+    try { navigator.clipboard.writeText($("#signCode").value); $("#signMsg").textContent = "코드를 복사했습니다. 오픈채팅에 붙여 넣어 보내세요."; } catch { /* 직접 복사 */ }
   });
   let fails = 0;
   $("#gateForm").addEventListener("submit", async (e) => {

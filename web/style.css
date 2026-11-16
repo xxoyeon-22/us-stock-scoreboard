@@ -215,6 +215,9 @@ body.locked > *:not(#gate) { visibility: hidden; }
 .gate-code { width: 100%; margin-top: 12px; background: var(--bg); color: var(--text2); border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; padding: 8px; resize: none; word-break: break-all; }
 body:not(.is-admin) .admin-only { display: none !important; }
 
+.ko-nm { color: var(--text); font-weight: 600; margin-right: 2px; }
+.nm { max-width: 320px; }
+
 /* 투자 성향 */
 .prow { display: grid; grid-template-columns: 92px 150px minmax(0, 1fr); gap: 4px 14px; align-items: center; padding: 6px 0; font-size: 13px; }
 .crow { display: grid; grid-template-columns: 130px minmax(0, 1fr) 34px 64px; gap: 12px; align-items: center; padding: 6px 4px; cursor: pointer; border-top: 1px solid var(--line2); }

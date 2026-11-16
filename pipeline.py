@@ -273,6 +273,9 @@ def run_calendar(client: Finnhub | None = None) -> None:
 def write_static() -> None:
     """설정 파일 중 화면에서 쓰는 것(증권사 수수료)을 JSON 으로 내보낸다."""
     write_json(out_dir() / "brokers.json", load_config("brokers"))
+    ko = read_json(ROOT / "config" / "ko_names.json")       # 기업 한글 이름 (원본은 config, 화면용 사본은 매번 새로 쓴다)
+    if ko:
+        write_json(out_dir() / "ko_names.json", ko)
 
 
 # ---------------------------------------------------------------- 뉴스
@@ -558,6 +561,30 @@ def run_analyze() -> None:
             print(f"[analyze] Claude 호출 {analyst.calls}회, 입력 {analyst.usage['input']:,} / 출력 {analyst.usage['output']:,} 토큰 ({analyst.model})")
 
 
+def run_names() -> None:
+    """S&P 500 기업의 한글 이름 중 아직 없는 것만 Claude(싼 모델)로 만들어 config/ko_names.json 에 보탠다."""
+    from analysis.llm import Analyst, Ledger, LLMUnavailable
+
+    settings = load_config("settings")
+    cfg = settings.get("llm", {})
+    path = ROOT / "config" / "ko_names.json"
+    names = read_json(path) or {}
+    todo = [u for u in load_universe(settings) if u["symbol"] not in names]
+    if todo:
+        try:
+            analyst = Analyst(cfg, Ledger(out_dir(settings) / "usage.json", cfg.get("budget_usd", 8.0)))
+            for i in range(0, len(todo), 80):
+                got = analyst.names([{"symbol": u["symbol"], "name": u["name"]} for u in todo[i:i + 80]])
+                names.update(got)
+                path.write_text(json.dumps(names, ensure_ascii=False, indent=0, sort_keys=True), encoding="utf-8")
+            print(f"[names] 한글 이름 {len(names)}개 (새로 만든 {len(todo)}개 중 성공 분 포함), 누적 비용 ${analyst.ledger.spent:.4f}")
+        except LLMUnavailable as e:
+            print(f"[names] 중단: {e}")
+    else:
+        print(f"[names] 새로 만들 이름이 없습니다 ({len(names)}개)")
+    write_static()
+
+
 # ---------------------------------------------------------------- 샘플
 
 SAMPLE = [
@@ -685,7 +712,7 @@ def main() -> int:
         except (AttributeError, ValueError):
             pass
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("command", choices=["news", "scores", "investors", "analyze", "rescore", "calendar", "auto", "sample"])
+    p.add_argument("command", choices=["news", "scores", "investors", "analyze", "rescore", "calendar", "names", "auto", "sample"])
     p.add_argument("--limit", type=int, help="scores: 앞에서 N개 종목만 (시험용)")
     args = p.parse_args()
     load_env()
@@ -696,7 +723,7 @@ def main() -> int:
         if args.command == "scores":
             run_scores(args.limit)
         else:
-            {"news": run_news, "calendar": run_calendar, "investors": run_investors, "analyze": run_analyze, "rescore": rescore,
+            {"news": run_news, "calendar": run_calendar, "names": run_names, "investors": run_investors, "analyze": run_analyze, "rescore": rescore,
              "auto": run_auto, "sample": run_sample}[args.command]()
     except (FinnhubError, RuntimeError) as e:
         print(f"오류: {e}", file=sys.stderr)

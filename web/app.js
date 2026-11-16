@@ -64,6 +64,8 @@ const ACTION = { new: ["up", "신규 편입"], add: ["up", "비중 확대"], hol
 const RISK = { low: ["", "낮음"], mid: ["", "보통"], high: ["hi", "높음"] };
 const CAVEAT = "이 전망은 최근 뉴스 동향만으로 만든 추정입니다. 실제 주가는 다르게 움직일 수 있으니 참고만 하세요.";
 const brief = (sym) => S.analysis?.stocks?.[sym] || null;
+const koName = (sym) => S.ko?.[sym] || "";                                  // 기업 한글 이름 (구글, 엔비디아 …)
+const nameHTML = (sym, name) => { const k = koName(sym); return k ? `<b class="ko-nm">${esc(k)}</b> ${esc(name)}` : esc(name); };
 const stanceTag = (s, fill) => { const [c, t] = STANCE[s] || STANCE.neutral; return `<span class="tag ${c} ${fill && c ? "fill" : ""}">${t}</span>`; };
 
 // ---------- 장 상태 (공휴일은 반영하지 않는다) ----------
@@ -103,11 +105,12 @@ async function loadScores() {
   }
 }
 async function loadExtras() {
-  const [an, inv, cal, br] = await Promise.all(["analysis", "investors", "calendar", "brokers"].map((n) => data(n).catch(() => null)));
+  const [an, inv, cal, br, kn] = await Promise.all(["analysis", "investors", "calendar", "brokers", "ko_names"].map((n) => data(n).catch(() => null)));
   if (an) S.analysis = an;
   if (inv) S.investors = inv;
   if (cal) { S.calendar = cal; S.earnBySym = new Map(); for (const e of cal.earnings || []) if (!S.earnBySym.has(e.symbol)) S.earnBySym.set(e.symbol, e); }
   if (br) { S.brokers = br; fillBrokerSelect($("#capBroker")); }
+  if (kn) S.ko = kn;
   renderAll();
 }
 async function loadNews() {
@@ -159,7 +162,7 @@ function filtered() {
   const q = S.q.trim().toLowerCase();
   return S.scores.stocks.filter((s) => {
     if (S.sector && s.sector !== S.sector) return false;
-    if (q && !s.symbol.toLowerCase().includes(q) && !s.name.toLowerCase().includes(q)) return false;
+    if (q && !s.symbol.toLowerCase().includes(q) && !s.name.toLowerCase().includes(q) && !koName(s.symbol).toLowerCase().includes(q)) return false;
     if (S.hideIlliquid && s.info?.low_liquidity) return false;
     if (S.outlook) { const o = OUTLOOK[brief(s.symbol)?.outlook]; if (!o || o.dir !== S.outlook) return false; }
     return true;
@@ -191,7 +194,7 @@ function renderRank() {
     const rk = RISK[s.info?.risk_level];
     return `<tr data-sym="${esc(s.symbol)}">
       <td class="rk">${String(rankOf.get(s.symbol)).padStart(2, "0")}</td>
-      <td><span class="sym">${esc(s.symbol)}</span><span class="nm">${esc(s.name)}</span></td>
+      <td><span class="sym">${esc(s.symbol)}</span><span class="nm">${nameHTML(s.symbol, s.name)}</span></td>
       <td class="hide-m dim">${esc(s.sector)}</td>
       <td><div class="sc"><b>${s.score == null ? "—" : fmt(s.score, 1)}</b><span class="seg" aria-hidden="true">${Array.from({ length: 10 }, (_, k) => `<i class="${k < filled ? "f" : ""}"></i>`).join("")}</span></div></td>
       <td class="num ${cls(delta)}">${arrow(delta)}</td>
@@ -416,7 +419,7 @@ function renderTonight() {
   const card = (r, i) => {
     const o = OUTLOOK[r.a?.outlook];
     return `<div class="pick" data-sym="${esc(r.s.symbol)}"><div class="no">${i + 1}</div><div class="body">
-      <div class="l1"><span><span class="sym">${esc(r.s.symbol)}</span><span class="nm">${esc(r.s.name)}</span></span><span class="q" data-q="${esc(r.s.symbol)}"></span></div>
+      <div class="l1"><span><span class="sym">${esc(r.s.symbol)}</span><span class="nm">${nameHTML(r.s.symbol, r.s.name)}</span></span><span class="q" data-q="${esc(r.s.symbol)}"></span></div>
       <div class="l2"><span class="tag hi">점수 ${fmt(r.s.score, 1)}</span>${o ? `<span class="tag ${o.dir} ${o.mark.length > 1 ? "fill" : ""}">${o.mark} ${o.short}</span>` : `<span class="tag">전망 없음</span>`}
         ${r.a ? stanceTag(r.a.stance) : ""}<span class="dim small">${esc(r.s.sector)}</span></div>
       <ul>${r.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
@@ -492,7 +495,7 @@ function renderInvestors() {
   const c = i.counts || {};
   const actTag = (h) => { const a = ACTION[h.action]; return a ? `<span class="tag ${a[0]}">${a[1]}${h.change_pct != null && h.action !== "hold" && h.action !== "exit" ? " " + sign(h.change_pct, 0, "%") : ""}</span>` : `<span class="dim">—</span>`; };
   const row = (h) => `<tr ${h.ticker && S.bySymbol.has(h.ticker) ? `data-sym="${esc(h.ticker)}" style="cursor:pointer"` : ""}>
-    <td><span class="sym">${esc(h.ticker || "—")}</span><span class="nm">${esc(h.issuer)}${h.put_call ? ` (${esc(h.put_call)} 옵션)` : ""}</span></td>
+    <td><span class="sym">${esc(h.ticker || "—")}</span><span class="nm">${h.ticker && koName(h.ticker) ? nameHTML(h.ticker, h.issuer) : esc(h.issuer)}${h.put_call ? ` (${esc(h.put_call)} 옵션)` : ""}</span></td>
     <td class="num">${fmt(h.pct, 1)}%</td><td><span class="bar"><i style="width:${Math.min(100, h.pct * 4)}%"></i></span></td>
     <td class="num">${usdBig(h.value)}</td><td>${actTag(h)}</td></tr>`;
   const newsHTML = (i.news || []).map((n) => `<li><div class="t">${ago(n.published)}</div><div class="b">
@@ -633,7 +636,7 @@ function openDetail(sym, keep) {
   $("#detail").innerHTML = `
     <div class="d-top"><div class="eyebrow">RANK ${String(rank).padStart(2, "0")} · ${esc(s.sector)}</div>
       <button id="closeDrawer" aria-label="닫기"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2l12 12M14 2L2 14"/></svg></button></div>
-    <div class="d-id"><div><div class="big">${esc(s.symbol)}</div><div style="margin-top:8px;color:var(--text2)">${esc(s.name)}</div></div>
+    <div class="d-id"><div><div class="big">${esc(s.symbol)}</div><div style="margin-top:8px;color:var(--text2)">${nameHTML(s.symbol, s.name)}</div></div>
       <div><div class="eyebrow">종합 점수</div><div class="big">${s.score == null ? "—" : fmt(s.score, 1)}</div><div class="mono small ${cls(delta)}">${delta == null ? "전일 점수 없음" : arrow(delta) + " 전일 대비"}</div></div></div>
     <div class="d-px" id="dq"></div>
     ${S.scores.sample ? `<div class="banner solid">샘플 데이터 · 실제 수치 아님</div>` : ""}
@@ -782,7 +785,7 @@ function renderMine() {
     const o = OUTLOOK[r.v.a?.outlook];
     const kv = (k, v) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`;
     return `<div class="hold ${r.v.tone}">
-      <div class="l1"><span><button class="tk" data-sym="${esc(r.sym)}" style="font-size:15px">${esc(r.sym)}</button><span class="nm">${esc(r.st?.name || "")}</span> <span class="tag">${esc(brokerName(r.bid))}</span></span>
+      <div class="l1"><span><button class="tk" data-sym="${esc(r.sym)}" style="font-size:15px">${esc(r.sym)}</button><span class="nm">${r.st ? nameHTML(r.sym, r.st.name) : esc(koName(r.sym))}</span> <span class="tag">${esc(brokerName(r.bid))}</span></span>
         <span class="q">${r.px != null ? `$${fmt(r.px)}` : `<span class="dim">가격 없음</span>`}${r.q?.dp != null ? `<span class="blk ${cls(r.q.dp) || "flat"}">${sign(r.q.dp, 2, "%")}</span>` : ""}</span></div>
       <div class="kv">${kv("수량", `${fmt(r.shares, r.shares % 1 ? 4 : 0)}주`)}${kv("평균 매수가", `$${fmt(r.avg)}`)}${kv("투자금 (수수료 포함)", `$${fmt(r.costFee, 0)}`)}
         ${kv("평가금액", r.val != null ? `$${fmt(r.val, 0)}` : "—")}
