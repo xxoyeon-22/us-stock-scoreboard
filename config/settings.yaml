@@ -21,6 +21,7 @@ llm:
   effort: {headlines: low, stock: low, investor: low}
   headline_batch: 40            # 한 번의 호출에 넣는 헤드라인 수
   max_headlines_per_run: 160    # 한 번 실행에서 새로 풀이할 헤드라인 상한
+  moat_per_run: 60              # 하루 한 번(자동 실행) 새로 분석할 해자 종목 수 — Haiku, 종목당 약 0.15센트
   investor_min_hours: 72        # 같은 투자자 요약을 다시 만들기까지 최소 간격 (비용 절감)
   max_stocks_per_day: 10       # 하루에 새로 분석할 종목 수 상한 — 비용 상한 역할
   min_hours_between: 12         # 같은 종목을 다시 분석하기까지 최소 간격

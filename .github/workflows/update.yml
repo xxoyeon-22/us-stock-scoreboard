@@ -23,7 +23,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180          # 하루 한 번 도는 날은 점수(약 35분) + 가격 이력 + 희석·수급(주 1회) 수집이 겹친다
     steps:
       - uses: actions/checkout@v4
 

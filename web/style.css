@@ -220,6 +220,16 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .ko-nm { color: var(--text); font-weight: 600; margin-right: 2px; }
 .nm { max-width: 320px; }
 
+/* 차트·시장 */
+.cwrap { position: relative; } .chart { width: 100%; height: auto; display: block; touch-action: pan-y; }
+.chart text { fill: var(--dim); font-size: 11px; font-family: var(--mono); } .chart .grid { stroke: var(--line2); stroke-width: 1; } .chart .cur { stroke: var(--text2); stroke-width: 1; stroke-dasharray: 3 3; }
+.ctip { position: absolute; top: 4px; min-width: 120px; background: var(--bg); border: 1px solid var(--line3); padding: 6px 10px; font-size: 12px; pointer-events: none; z-index: 2; }
+.ctip div { display: flex; align-items: center; gap: 6px; } .ctip i { width: 8px; height: 8px; display: inline-block; }
+.rng { display: flex; flex-wrap: wrap; } .rng button { min-height: 28px; padding: 0 9px; font-size: 12px; border-right: 0; } .rng button:last-child { border-right: 1px solid var(--line); } .rng button.on { background: var(--on); color: var(--ink); border-color: var(--on); }
+.mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-top: 14px; }
+.mcard { border: 1px solid var(--line); background: var(--panel); padding: 12px 14px; } .mcard .k { font-size: 12px; color: var(--dim); } .mcard .v { font-family: var(--mono); font-size: 24px; font-weight: 600; } .mcard .v small { font-size: 12px; color: var(--dim); margin-left: 4px; font-weight: 400; }
+.spark { width: 100%; height: 30px; display: block; margin: 6px 0 2px; }
+
 /* 투자 성향 */
 .prow { display: grid; grid-template-columns: 92px 150px minmax(0, 1fr); gap: 4px 14px; align-items: center; padding: 6px 0; font-size: 13px; }
 .crow { display: grid; grid-template-columns: 130px minmax(0, 1fr) 34px 64px; gap: 12px; align-items: center; padding: 6px 4px; cursor: pointer; border-top: 1px solid var(--line2); }

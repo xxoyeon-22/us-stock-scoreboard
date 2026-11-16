@@ -7,7 +7,7 @@
 const FH = "https://finnhub.io/api/v1";
 const PAGE = 50;                 // Finnhub 무료 웹소켓 구독 한도
 const KEY_NAME = "finnhub_key", FEE_NAME = "fee_overrides";
-const TABS = ["rank", "tonight", "mypage", "investors", "news", "calendar", "fees", "settings"];
+const TABS = ["rank", "tonight", "mypage", "investors", "market", "backtest", "news", "calendar", "fees", "settings"];
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 
@@ -105,12 +105,15 @@ async function loadScores() {
   }
 }
 async function loadExtras() {
-  const [an, inv, cal, br, kn] = await Promise.all(["analysis", "investors", "calendar", "brokers", "ko_names"].map((n) => data(n).catch(() => null)));
+  const [an, inv, cal, br, kn, mk, bt, sn] = await Promise.all(["analysis", "investors", "calendar", "brokers", "ko_names", "market", "backtest", "snapshots"].map((n) => data(n).catch(() => null)));
   if (an) S.analysis = an;
   if (inv) S.investors = inv;
   if (cal) { S.calendar = cal; S.earnBySym = new Map(); for (const e of cal.earnings || []) if (!S.earnBySym.has(e.symbol)) S.earnBySym.set(e.symbol, e); }
   if (br) { S.brokers = br; fillBrokerSelect($("#capBroker")); }
   if (kn) S.ko = kn;
+  if (mk) S.market = mk;
+  if (bt) S.backtest = bt;
+  if (sn) S.snaps = sn;
   renderAll();
 }
 async function loadNews() {
@@ -139,7 +142,7 @@ function mergedNews() {
   return out.sort((a, b) => (a.published < b.published ? 1 : -1));
 }
 function renderAll() {
-  renderStrip(); renderRank(); renderTonight(); renderMine(); renderWeights(); renderInvestors(); renderCalendar(); renderFees(); renderNews();
+  renderStrip(); renderRank(); renderTonight(); renderMine(); renderWeights(); renderMarket(); renderBacktest(); renderInvestors(); renderCalendar(); renderFees(); renderNews();
   if (S.detail) openDetail(S.detail, true);
 }
 
@@ -236,6 +239,16 @@ function paintQuote(sym, flash) {
   }
   if (S.detail === sym) paintDetailQuote();
   if (S.mineSyms?.has(sym)) queueMine();
+  if (S.detail === sym) liveChart(sym);
+}
+let liveChartTimer = 0;
+function liveChart(sym) {            // 체결이 들어올 때마다 그리면 부담이라 1.5초에 한 번만, 마우스로 값을 보는 중이면 건너뛴다
+  if (liveChartTimer) return;
+  liveChartTimer = setTimeout(() => {
+    liveChartTimer = 0;
+    const tip = $("#stockChart .ctip");
+    if (S.detail === sym && S.pc[sym] && !(tip && !tip.hidden)) paintChart(sym);
+  }, 1500);
 }
 
 // ---------- 실시간 시세 ----------
@@ -607,7 +620,7 @@ function riskBlock(s) {
   if (e) { const diff = Math.round((new Date(e.date + "T00:00:00") - new Date(new Date().toISOString().slice(0, 10) + "T00:00:00")) / 864e5); if (diff >= 0 && diff <= 7) soon = `<div class="pending" style="margin-top:10px">실적 발표가 ${diff === 0 ? "오늘" : diff + "일 뒤"}(${esc(e.date)})입니다. 발표 전후에는 주가가 크게 움직일 수 있습니다.</div>`; }
   return `<div class="d-sec"><div class="sec-title"><h3>위험·타이밍</h3>${rk ? `<span class="tag ${rk[0]}">변동성 ${rk[1]}</span>` : ""}</div>
     <div class="kv">${kv("베타 (시장 대비 민감도)", i.beta == null ? "—" : fmt(i.beta, 2))}${kv("52주 고점 대비", i.from_high_pct == null ? "—" : sign(i.from_high_pct, 1, "%"))}
-    ${kv("하루 평균 거래대금", usdBig(i.dollar_volume))}${kv("다음 실적 발표", e ? esc(e.date) : "—")}</div>
+    ${kv("하루 평균 거래대금", usdBig(i.dollar_volume))}${kv("다음 실적 발표", e ? esc(e.date) : "—")}${kv("최대 낙폭 (1년)", i.mdd_1y == null ? "—" : sign(i.mdd_1y, 1, "%"))}${kv("연 변동성", i.vol_1y == null ? "—" : fmt(i.vol_1y, 0) + "%")}${kv("200일선 대비", s.components.momentum?.metrics?.ma200_gap ? sign(s.components.momentum.metrics.ma200_gap.value, 1, "%") : "—")}</div>
     ${i.low_liquidity ? `<div class="pending" style="margin-top:10px">거래대금이 적은 종목입니다. 사고팔 때 원하는 가격에 체결되지 않을 수 있습니다.</div>` : ""}${soon}</div>`;
 }
 function openDetail(sym, keep) {
@@ -630,6 +643,7 @@ function openDetail(sym, keep) {
     if (id === "investors" && Array.isArray(comp.detail)) body = comp.detail.map((x) => { const a = ACTION[x.action] || ["", x.action];
       return `<div class="invrow"><span>${esc(x.name)} <span class="dim small">비중 ${fmt(x.pct, 1)}%</span></span><span class="tag ${a[0]}">${a[1]}</span></div>`; }).join("")
       + `<div class="caveat">13F 공시는 분기 말 기준이며 최대 45일 늦게 공개됩니다.</div>`;
+    if (id === "moat") body = moatBody(comp);
     if (id === "news") body = `<div class="small dim">위 ‘쉬운 설명’의 뉴스 감성 점수(0~100)를 그대로 씁니다.</div>`;
     return `<div class="d-sec">${head}${body}</div>`;
   }).join("");
@@ -640,11 +654,11 @@ function openDetail(sym, keep) {
       <div><div class="eyebrow">종합 점수</div><div class="big">${s.score == null ? "—" : fmt(s.score, 1)}</div><div class="mono small ${cls(delta)}">${delta == null ? "전일 점수 없음" : arrow(delta) + " 전일 대비"}</div></div></div>
     <div class="d-px" id="dq"></div>
     ${S.scores.sample ? `<div class="banner solid">샘플 데이터 · 실제 수치 아님</div>` : ""}
-    ${aiBlock(s)}${riskBlock(s)}${sections}
+    ${chartBlock()}${targetBlock(s)}${aiBlock(s)}${riskBlock(s)}${sections}
     <div class="d-sec"><div class="sec-title"><h3>최근 뉴스</h3></div><ul class="d-news" id="dnews"></ul></div>
     <div class="d-sec small dim" style="border:0">막대는 같은 섹터 안에서의 백분위입니다. 투자 판단의 책임은 본인에게 있으며 투자 권유가 아닙니다.</div>`;
   $("#drawer").hidden = false; $("#scrim").hidden = false;
-  paintDetailQuote(); renderDetailNews();
+  paintDetailQuote(); renderDetailNews(); loadChart(sym);
   if (!keep) { $("#drawer").scrollTop = 0; S.companyNews = null; loadCompanyNews(sym); syncLive(); }
 }
 function paintDetailQuote() {
@@ -1119,6 +1133,162 @@ $("#clearAKey").addEventListener("click", () => {
 });
 if (S.akey) $("#akeyStatus").textContent = "이 브라우저에 키가 저장되어 있습니다.";
 fillBrokerSelect($("#capBroker"));
+
+// ---------- 차트 (종목 가격, 백테스트 곡선) ----------
+S.pc = {}; S.chartRange = "1y"; S.market = null; S.backtest = null; S.snaps = null; S.targets = {};
+try { S.targets = JSON.parse(localStorage.getItem("my_targets") || "{}"); } catch { /* 저장소 차단 */ }
+function drawChart(el, { labels, series, w = 720, h = 260, fmtY = (v) => fmt(v, 0) }) {
+  const pad = { l: 54, r: 12, t: 12, b: 26 };
+  const vals = series.flatMap((s) => s.values).filter((v) => v != null && isFinite(v));
+  if (!vals.length || labels.length < 2) { el.innerHTML = `<p class="empty" style="padding:14px 0">표시할 자료가 없습니다.</p>`; return; }
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const sp = (hi - lo) || Math.abs(hi) || 1; lo -= sp * 0.06; hi += sp * 0.06;
+  const n = labels.length, X = (i) => pad.l + i / (n - 1) * (w - pad.l - pad.r), Y = (v) => pad.t + (1 - (v - lo) / (hi - lo)) * (h - pad.t - pad.b);
+  const grid = [0, 1, 2, 3].map((k) => { const v = lo + (hi - lo) * k / 3, yy = Y(v); return `<line class="grid" x1="${pad.l}" x2="${w - pad.r}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}"/><text x="${pad.l - 6}" y="${(yy + 4).toFixed(1)}" text-anchor="end">${esc(fmtY(v))}</text>`; }).join("");
+  const path = (vs) => { let d = "", pen = false; vs.forEach((v, i) => { if (v == null) { pen = false; return; } d += `${pen ? "L" : "M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`; pen = true; }); return d; };
+  const lines = series.map((s) => `<path d="${path(s.values)}" fill="none" style="stroke:${s.color}" stroke-width="${s.width || 1.6}" ${s.dash ? `stroke-dasharray="${s.dash}"` : ""} stroke-linejoin="round"/>`).join("");
+  const xl = [0, Math.floor((n - 1) / 2), n - 1].map((i, k) => `<text x="${X(i).toFixed(1)}" y="${h - 6}" text-anchor="${k === 0 ? "start" : k === 2 ? "end" : "middle"}">${esc(labels[i])}</text>`).join("");
+  el.innerHTML = `<div class="cwrap"><svg viewBox="0 0 ${w} ${h}" class="chart" role="img" aria-label="차트">${grid}${lines}${xl}<line class="cur" y1="${pad.t}" y2="${h - pad.b}" x1="0" x2="0" hidden/></svg><div class="ctip" hidden></div></div>`;
+  const svg = el.querySelector("svg"), tip = el.querySelector(".ctip"), cur = el.querySelector(".cur");
+  const move = (clientX) => {
+    const r = svg.getBoundingClientRect(), vx = (clientX - r.left) / r.width * w;
+    const i = Math.max(0, Math.min(n - 1, Math.round((vx - pad.l) / (w - pad.l - pad.r) * (n - 1))));
+    cur.setAttribute("x1", X(i)); cur.setAttribute("x2", X(i)); cur.removeAttribute("hidden"); tip.hidden = false;
+    tip.innerHTML = `<b>${esc(labels[i])}</b>` + series.filter((s) => s.values[i] != null).map((s) => `<div><i style="background:${s.color}"></i>${esc(s.name)} ${esc(fmtY(s.values[i]))}</div>`).join("");
+    tip.style.left = Math.min(r.width - 150, Math.max(0, (X(i) / w) * r.width + 10)) + "px";
+  };
+  svg.onmousemove = (e) => move(e.clientX); svg.ontouchmove = (e) => move(e.touches[0].clientX);
+  svg.onmouseleave = () => { tip.hidden = true; cur.setAttribute("hidden", ""); };
+}
+const RANGES = [["1m", "1개월", 21, "d"], ["3m", "3개월", 63, "d"], ["6m", "6개월", 126, "d"], ["1y", "1년", 252, "d"], ["3y", "3년", 156, "w"], ["5y", "5년", 9999, "w"]];
+function chartBlock() {
+  return `<div class="d-sec"><div class="sec-title"><h3>주가 차트</h3><span class="rng">${RANGES.map(([k, l]) => `<button data-rng="${k}" class="${S.chartRange === k ? "on" : ""}">${l}</button>`).join("")}</span></div>
+    <div id="stockChart" class="chartbox"><p class="dim small">불러오는 중…</p></div><div id="chartNote" class="small dim" style="margin-top:6px"></div></div>`;
+}
+async function loadChart(sym) {
+  if (!(sym in S.pc)) { try { S.pc[sym] = await getJSON(`data/prices/${encodeURIComponent(sym)}.json?t=${Math.floor(Date.now() / 3.6e6)}`); } catch { S.pc[sym] = null; } }
+  if (S.detail === sym) paintChart(sym);
+}
+function sma(arr, n) { const out = []; let sum = 0; arr.forEach((v, i) => { sum += v; if (i >= n) sum -= arr[i - n]; out.push(i >= n - 1 ? sum / n : null); }); return out; }
+function paintChart(sym) {
+  const el = $("#stockChart");
+  if (!el) return;
+  const p = S.pc[sym];
+  if (!p) { el.innerHTML = `<p class="empty" style="padding:14px 0">가격 이력이 없습니다. (수집 전이거나 이 종목은 받지 못했습니다)</p>`; return; }
+  const [, , count, kind] = RANGES.find((r) => r[0] === S.chartRange) || RANGES[3];
+  let src = kind === "w" ? p.w : p.d;
+  const q = S.quotes.get(sym), liveOn = !!(q?.live && q.c > 0);
+  if (liveOn) {      // 실시간 가격이 있으면 마지막 점을 현재가로 바꾸거나, 새 거래일이면 오늘 점을 덧붙인다
+    const day = new Date((q.t || Date.now() / 1000) * 1000).toISOString().slice(0, 10), last = src[src.length - 1];
+    const sameBucket = last && (kind === "w" ? day >= last[0] && (new Date(day) - new Date(last[0])) / 864e5 < 7 : last[0] === day);
+    src = sameBucket ? [...src.slice(0, -1), [last[0], q.c]] : (last && day > last[0] ? [...src, [day, q.c]] : src);
+  }
+  const [a, b] = kind === "w" ? [10, 40] : [50, 200], u = kind === "w" ? "주" : "일";
+  const closes = src.map((x) => x[1]), m1 = sma(closes, a), m2 = sma(closes, b), cut = Math.max(0, src.length - count);
+  const labels = src.slice(cut).map((x) => x[0]), px = closes.slice(cut), up = px[px.length - 1] >= px[0], chg = (px[px.length - 1] / px[0] - 1) * 100;
+  drawChart(el, { labels, fmtY: (v) => fmt(v, v >= 100 ? 0 : 2), series: [
+    { name: "종가", values: px, color: up ? "var(--up)" : "var(--down)", width: 2 },
+    { name: `${a}${u}선`, values: m1.slice(cut), color: "var(--on)", width: 1 },
+    { name: `${b}${u}선`, values: m2.slice(cut), color: "var(--dim)", width: 1.2, dash: "4 3" },
+    ...(S.targets[sym] ? [{ name: "내 목표가", values: px.map(() => S.targets[sym]), color: "var(--on)", width: 1.2, dash: "2 4" }] : [])] });
+  $("#chartNote").innerHTML = `이 기간 <span class="${cls(chg)}">${sign(chg, 1, "%")}</span> · ${esc(labels[0])} ~ ${esc(labels[labels.length - 1])} · 흰 선 ${a}${u} 이동평균, 점선 ${b}${u} 이동평균 · 배당·분할을 반영한 수정주가${liveOn ? ` · <b class="up">● 실시간 반영 중</b>` : S.key ? "" : " · 실시간 반영은 설정 탭에 Finnhub 키가 필요합니다"}`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-rng]");
+  if (!b) return;
+  S.chartRange = b.dataset.rng;
+  $$(".rng button").forEach((x) => x.classList.toggle("on", x === b));
+  if (S.detail) paintChart(S.detail);
+});
+
+// ---------- 목표주가 (직접 입력, 이 브라우저에만 저장) ----------
+function targetBlock(s) {
+  const t = S.targets[s.symbol], px = S.quotes.get(s.symbol)?.c;
+  return `<div class="d-sec"><div class="sec-title"><h3>목표주가 <span class="wt">내가 입력</span></h3>${t && px ? `<span class="mono ${cls(t - px)}">${sign((t / px - 1) * 100, 1, "%")}</span>` : ""}</div>
+    <div class="row"><input id="tpInput" type="text" inputmode="decimal" placeholder="목표주가 (USD)" value="${t ?? ""}" aria-label="목표주가"><button id="tpSave" data-tp="${esc(s.symbol)}">저장</button>${t ? `<button id="tpClear" data-tp="${esc(s.symbol)}">지우기</button>` : ""}</div>
+    <div class="small dim" style="margin-top:6px">${t && px ? `목표 $${fmt(t)} · 현재가 $${fmt(px)} — 현재가 대비 <span class="${cls(t - px)}">${sign((t / px - 1) * 100, 1, "%")}</span>. 차트에 점선으로 표시됩니다.` : "증권사 앱이나 리포트에서 확인한 목표주가를 입력하면 차트에 점선으로 표시하고 현재가 대비 %를 계산합니다."}</div>
+    <div class="caveat">애널리스트 컨센서스 목표주가는 무료로 받을 수 있는 공식 출처가 없어 자동으로 채우지 못합니다. 목표주가는 애널리스트 개인의 전망이며 맞는다는 보장이 없습니다.</div></div>`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-tp]");
+  if (!b) return;
+  const sym = b.dataset.tp, v = b.id === "tpClear" ? 0 : parseNum($("#tpInput").value);
+  if (v > 0) S.targets[sym] = v; else delete S.targets[sym];
+  try { localStorage.setItem("my_targets", JSON.stringify(S.targets)); } catch { /* noop */ }
+  openDetail(sym, true);
+});
+
+// ---------- 해자 (종목 상세) ----------
+function moatBody(comp) {
+  const d = comp.detail || {};
+  return `<div class="small" style="color:var(--text2)">${esc(d.summary || "")}</div>
+    ${(d.sources || []).length ? `<ul class="plain small" style="margin-top:6px">${d.sources.map((x) => `<li><b>${esc(x.type)}</b> — ${esc(x.evidence)}</li>`).join("")}</ul>` : ""}
+    ${(d.threats || []).length ? `<div class="small dim" style="margin-top:6px"><b>위협</b> ${d.threats.map(esc).join(" · ")}</div>` : ""}
+    <div class="caveat">AI 가 10-K(${esc(d.filed || "")}) 사업 설명만 읽고 매긴 주관적 점수입니다. 글에서 근거가 확인된 정도: ${esc(({ low: "낮음", medium: "보통", high: "높음" })[d.confidence] || "—")}.</div>`;
+}
+
+// ---------- 시장 국면 ----------
+function sparkSVG(vals) {
+  if (!vals?.length) return "";
+  const w = 110, h = 30, lo = Math.min(...vals), hi = Math.max(...vals), sp = (hi - lo) || 1;
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1 || 1) * w).toFixed(1)},${(h - 3 - (v - lo) / sp * (h - 6)).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 ${w} ${h}" class="spark" aria-hidden="true"><polyline points="${pts}" fill="none" style="stroke:${vals[vals.length - 1] >= vals[0] ? "var(--up)" : "var(--down)"}" stroke-width="1.6"/></svg>`;
+}
+function renderMarket() {
+  const el = $("#marketBody"), m = S.market;
+  if (!el) return;
+  if (!m) { el.innerHTML = `<p class="empty panel">시장 자료가 아직 없습니다. 데이터 수집이 한 번 돌면 채워집니다.</p>`; return; }
+  $("#marketStamp").textContent = `수집 ${kst(m.generated_at)} KST`;
+  const r = m.regime, tone = r.coef >= 1.05 ? "up" : r.coef <= 0.92 ? "down" : "";
+  const card = (c) => `<div class="mcard"><div class="k">${esc(c.label)}</div><div class="v">${fmt(c.value, c.id === "spx" || c.id === "krw" ? 1 : 2)}<small>${esc(c.unit)}</small></div>
+    <div class="small ${cls(c.change)}">${c.change == null ? "—" : `${sign(c.change, 2, c.change_unit)} <span class="dim">(1~3개월 전 대비)</span>`}</div>${sparkSVG(c.spark)}<div class="small dim">${esc(c.as_of)}</div></div>`;
+  $("#marketBody").innerHTML = `
+    <div class="panel pad"><div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-bottom:8px">
+        <span class="tag ${tone} ${tone ? "fill" : ""} big" style="font-size:15px">${esc(r.label)}</span>
+        <span class="mono" style="font-size:22px;font-weight:600">× ${fmt(r.coef, 2)}</span><span class="dim small">합계 ${sign(r.points, 0)}점 · ${esc(r.rule)}</span></div>
+      <p class="dim small" style="margin:0 0 10px">이 계수는 모든 종목의 최종 점수에 곱해집니다 (종합 점수 = 종목 점수 × 계수). 시장이 위험하면 점수를 조금 낮추고, 우호적이면 조금 올립니다.
+        규칙은 출발점으로 잡은 임의값이며 검증된 예측 모델이 아닙니다.</p>
+      ${r.factors.map((f) => `<div class="prow" style="grid-template-columns:230px 70px minmax(0,1fr)"><b>${esc(f.label)}</b><span><span class="tag ${f.points > 0 ? "up" : f.points < 0 ? "down" : ""}">${sign(f.points, 0, "점")}</span></span><span class="dim">${f.value == null ? "" : fmt(f.value, 2) + " · "}${esc(f.note)}</span></div>`).join("")}</div>
+    <div class="mgrid">${m.indicators.map(card).join("")}</div>
+    <p class="note">출처: FRED(미 국채·물가·고용·VIX), Yahoo Finance(지수·환율·유가). 물가·고용은 월 단위라 발표 시점이 늦습니다. 색은 수치가 오르면 빨강, 내리면 파랑이며 좋고 나쁨을 뜻하지 않습니다.</p>`;
+}
+
+// ---------- 검증: 백테스트 + 전진 검증 ----------
+function renderBacktest() {
+  const el = $("#backtestBody");
+  if (!el) return;
+  const b = S.backtest, res = b?.result;
+  let html = "";
+  if (!res) html += `<p class="empty panel">백테스트 자료가 아직 없습니다. 가격 이력 수집이 끝나면 채워집니다.</p>`;
+  else {
+    $("#backtestStamp").textContent = `계산 ${kst(b.generated_at)} KST`;
+    const st = res.stats, row = (k, name, color) => `<tr><td><i class="sq" style="background:${color}"></i> ${name}</td><td class="num">${sign(st[k].total_pct, 1, "%")}</td><td class="num">${sign(st[k].cagr_pct, 1, "%")}</td><td class="num">${fmt(st[k].vol_pct, 1)}%</td><td class="num">${sign(st[k].mdd_pct, 1, "%")}</td></tr>`;
+    html += `<div class="panel pad"><h2>가격 모멘텀 전략 백테스트 <span class="tag">종합 점수 전체가 아님</span></h2>
+      <p class="dim small" style="margin-top:0">${esc(res.start)} ~ ${esc(res.end)}, ${res.months}개월 · 12개월 수익률 상위 ${res.top_n}종목을 월말마다 동일 비중으로 담는 전략 · 월별로 S&P 500 을 이긴 비율 <b>${res.beat_months_pct}%</b></p>
+      <div id="btChart" class="chartbox"></div>
+      <div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>전략</th><th class="r">총 수익</th><th class="r">연환산</th><th class="r">연 변동성</th><th class="r">최대 낙폭</th></tr></thead><tbody>
+        ${row("momentum", "모멘텀 상위 " + res.top_n, "var(--up)")}${row("equal", "S&P 500 구성 종목 동일 비중", "var(--on)")}${row("sp500", "S&P 500 지수", "var(--down)")}</tbody></table></div>
+      <div class="warn" style="margin:12px 0 0">${(b.caveats || []).map((c) => `· ${esc(c)}`).join("<br>")}</div></div>`;
+  }
+  // 전진 검증
+  const snaps = (S.snaps?.snapshots || []);
+  const px = (sym) => S.bySymbol.get(sym)?.quote?.c;
+  const rows = snaps.map((sn) => {
+    const rets = sn.picks.map(([sym, p0]) => (px(sym) && p0 ? px(sym) / p0 - 1 : null)).filter((v) => v != null);
+    const avg = rets.length ? rets.reduce((t, v) => t + v, 0) / rets.length * 100 : null;
+    const spx = S.market?.spx && sn.spx ? (S.market.spx / sn.spx - 1) * 100 : null;
+    return { date: sn.date, days: Math.round((Date.now() - new Date(sn.date + "T00:00:00").getTime()) / 864e5), avg, spx, ex: avg != null && spx != null ? avg - spx : null };
+  }).filter((r) => r.days >= 1).reverse().slice(0, 40);
+  html += `<div class="panel pad" style="margin-top:14px"><h2>종합 점수 전진 검증 <span class="tag">실제 기록</span></h2>
+    <p class="dim small" style="margin-top:0">과거 점수는 되돌려 볼 수 없어서, 이 사이트가 <b>매일 종합 점수 상위 20개와 그날 가격을 기록</b>해 두고 이후 수익률을 S&P 500 과 비교합니다. 기록이 쌓여야 의미가 생기며, 처음 몇 주는 표본이 너무 적습니다.</p>
+    ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>기록일</th><th class="r">경과</th><th class="r">상위 20 평균</th><th class="r">S&P 500</th><th class="r">초과</th></tr></thead><tbody>${rows.map((r) => `<tr><td class="mono">${esc(r.date)}</td><td class="num">${r.days}일</td><td class="num ${cls(r.avg)}">${r.avg == null ? "—" : sign(r.avg, 2, "%")}</td><td class="num ${cls(r.spx)}">${r.spx == null ? "—" : sign(r.spx, 2, "%")}</td><td class="num ${cls(r.ex)}">${r.ex == null ? "—" : sign(r.ex, 2, "%p")}</td></tr>`).join("")}</tbody></table></div>`
+      : `<p class="empty" style="padding:12px 0">아직 하루 이상 지난 기록이 없습니다. 내일부터 표가 채워집니다.</p>`}</div>`;
+  el.innerHTML = html;
+  if (res) drawChart($("#btChart"), { labels: res.dates, fmtY: (v) => fmt(v, 0), series: [
+    { name: "모멘텀 상위 " + res.top_n, values: res.curves.momentum, color: "var(--up)", width: 2 },
+    { name: "동일 비중", values: res.curves.equal, color: "var(--on)", width: 1.4 },
+    { name: "S&P 500", values: res.curves.sp500, color: "var(--down)", width: 1.4, dash: "5 3" }] });
+}
 
 // ---------- 설정 ----------
 function renderWeights() {

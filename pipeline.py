@@ -24,7 +24,7 @@ import requests
 
 from analysis.investors import build_signals
 from analysis.scoring import score_universe
-from collectors import ROOT, USER_AGENT, load_config, load_env
+from collectors import ROOT, USER_AGENT, load_config, load_env, replace_retry
 from collectors import news as news_mod
 from collectors.finnhub import Finnhub, FinnhubError
 from collectors.universe import load_universe
@@ -56,7 +56,7 @@ def read_json(path, default=None):
 def write_json(path, data) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    tmp.replace(path)
+    replace_retry(tmp, path)
 
 
 def num(x):
@@ -166,7 +166,17 @@ def rescore() -> bool:
         print("[rescore] raw_metrics.json 이 없어 건너뜁니다 (scores 를 먼저 실행).")
         return False
     sample = bool(raw.get("sample"))
-    scored = score_universe(raw["stocks"], weights, load_extras(d, allow_sample=sample))
+    import jobs
+    extras = load_extras(d, allow_sample=sample)
+    market = read_json(d / "market.json") or {}
+    if not sample:
+        jobs.merge_extras(raw["stocks"], d, weights)          # 이동평균·희석·내부자·애널리스트 지표
+        if (market.get("regime") or {}).get("coef"):          # 시장 국면 보정 계수 (자동)
+            weights["regime"]["current"] = market["regime"]["coef"]
+        m = jobs.moat_extras()
+        if m:
+            extras["moat"] = m
+    scored = score_universe(raw["stocks"], weights, extras)
 
     path = d / "scores.json"
     prev = read_json(path) or {}
@@ -190,6 +200,8 @@ def rescore() -> bool:
         "sample": sample, "universe": settings["universe"]["name"], "count": len(scored),
         "coverage": coverage, "config": public_weights(weights, scored), "stocks": scored,
     })
+    if not sample:
+        jobs.snapshot(scored, d, market, today)
     print(f"[rescore] {len(scored)}개 종목 점수 계산 완료")
     return True
 
@@ -435,7 +447,7 @@ def run_analyze() -> None:
     cfg = settings.get("llm", {})
     d = out_dir(settings)
     try:
-        analyst = Analyst(cfg, Ledger(d / "usage.json", cfg.get("budget_usd", 8.0)))
+        analyst = Analyst(cfg, Ledger(d / "usage.json", cfg.get("budget_usd", 8.0), ROOT / "config" / "usage_local.json"))
     except LLMUnavailable as e:
         print(f"[analyze] {e} 쉬운 설명·전망 생성을 건너뜁니다.")
         return
@@ -572,7 +584,7 @@ def run_names() -> None:
     todo = [u for u in load_universe(settings) if u["symbol"] not in names]
     if todo:
         try:
-            analyst = Analyst(cfg, Ledger(out_dir(settings) / "usage.json", cfg.get("budget_usd", 8.0)))
+            analyst = Analyst(cfg, Ledger(out_dir(settings) / "usage.json", cfg.get("budget_usd", 8.0), ROOT / "config" / "usage_local.json"))
             for i in range(0, len(todo), 80):
                 got = analyst.names([{"symbol": u["symbol"], "name": u["name"]} for u in todo[i:i + 80]])
                 names.update(got)
@@ -701,6 +713,19 @@ def run_auto() -> None:
     if not (d / "calendar.json").exists():
         run_calendar()
     write_static()
+    # 느린 작업은 하루 한 번(daily) 돌리거나, 결과 파일이 아직 없을 때만 돌린다 — 10분마다 도는 뉴스 갱신을 늦추지 않게
+    import jobs
+    if daily or not (d / "market.json").exists():
+        jobs.run_market()
+    if daily or not (d / "x_prices.json").exists():
+        jobs.run_prices()
+        jobs.run_backtest_job()
+    if daily and jobs.stale(d / "x_xbrl.json", 24 * 6):         # 오래 걸리는 주간 수집은 하루 한 번 도는 때만 (파일이 없어도 10분 갱신을 막지 않게)
+        jobs.run_xbrl()
+    if daily and jobs.stale(d / "x_flow.json", 24 * 6):
+        jobs.run_flow()
+    if daily:
+        jobs.run_moat()                                         # 새 종목·1년 지난 10-K 만 (한 번에 최대 15개)
     run_analyze()
     rescore()
 
@@ -712,7 +737,7 @@ def main() -> int:
         except (AttributeError, ValueError):
             pass
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("command", choices=["news", "scores", "investors", "analyze", "rescore", "calendar", "names", "auto", "sample"])
+    p.add_argument("command", choices=["news", "scores", "investors", "analyze", "rescore", "calendar", "names", "prices", "market", "xbrl", "flow", "moat", "backtest", "auto", "sample"])
     p.add_argument("--limit", type=int, help="scores: 앞에서 N개 종목만 (시험용)")
     args = p.parse_args()
     load_env()
@@ -722,6 +747,13 @@ def main() -> int:
     try:
         if args.command == "scores":
             run_scores(args.limit)
+        elif args.command in ("prices", "market", "xbrl", "flow", "moat", "backtest"):
+            import jobs
+            fn = {"prices": jobs.run_prices, "xbrl": jobs.run_xbrl, "flow": jobs.run_flow, "moat": jobs.run_moat}.get(args.command)
+            if fn:
+                fn(args.limit)
+            else:
+                {"market": jobs.run_market, "backtest": jobs.run_backtest_job}[args.command]()
         else:
             {"news": run_news, "calendar": run_calendar, "names": run_names, "investors": run_investors, "analyze": run_analyze, "rescore": rescore,
              "auto": run_auto, "sample": run_sample}[args.command]()

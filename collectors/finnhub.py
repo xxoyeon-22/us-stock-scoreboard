@@ -56,5 +56,11 @@ class Finnhub:
     def quote(self, symbol: str) -> dict:
         return self.get("/quote", symbol=symbol) or {}
 
+    def insider_sentiment(self, symbol: str, frm: str, to: str) -> dict:
+        return self.get("/stock/insider-sentiment", symbol=symbol, **{"from": frm, "to": to}) or {}
+
+    def recommendation(self, symbol: str) -> list:
+        return self.get("/stock/recommendation", symbol=symbol) or []
+
     def market_news(self, category: str = "general") -> list:
         return self.get("/news", category=category) or []

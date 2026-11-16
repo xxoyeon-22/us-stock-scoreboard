@@ -5,6 +5,7 @@ SEC 는 연락처가 든 User-Agent 를 요구한다 → 환경변수 SEC_USER_A
 """
 import json
 import os
+import threading
 import time
 import xml.etree.ElementTree as ET
 
@@ -28,13 +29,15 @@ class Edgar:
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": ua, "Accept-Encoding": "gzip, deflate"})
         self._last = 0.0
+        self._lock = threading.Lock()
 
     def get(self, url: str) -> requests.Response:
         for attempt in range(4):
-            wait = self._last + 0.25 - time.monotonic()   # 초당 4회 이하 (SEC 한도 10회)
-            if wait > 0:
-                time.sleep(wait)
-            self._last = time.monotonic()
+            with self._lock:                               # 여러 스레드가 같이 써도 초당 4회 이하 (SEC 한도 10회)
+                wait = self._last + 0.25 - time.monotonic()
+                if wait > 0:
+                    time.sleep(wait)
+                self._last = time.monotonic()
             try:
                 r = self.session.get(url, timeout=30)
             except requests.RequestException:
