@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body class="locked">
 <div id="gate" class="gate" hidden>
@@ -211,13 +211,14 @@
     <div class="tablewrap">
       <table id="fees">
         <thead><tr>
-          <th>증권사</th><th class="r">매매 수수료 %</th><th class="r">환전 스프레드 %</th><th class="r">환율 우대 %</th>
+          <th>증권사</th><th class="r">매매 수수료 %</th><th class="r">환전 스프레드 %</th><th class="r" title="환전 스프레드를 몇 % 깎아 주는지 (삼성 ‘95% 우대’ → 95)">환율 우대 % ⓘ</th>
           <th class="r">환전 비용</th><th class="r">매수 수수료</th><th class="r">살 때 합계</th><th class="r">사고팔 때 합계</th>
         </tr></thead>
         <tbody></tbody>
       </table>
     </div>
     <p class="note" id="feeNote"></p>
+    <div id="feeInfo"></div>
   </section>
 
   <!-- 설정 -->
@@ -264,7 +265,7 @@
 <footer>
   투자 판단의 책임은 본인에게 있으며, 본 정보는 투자 권유가 아닙니다. 점수와 전망은 공개 데이터와 뉴스 동향을 기계적으로 처리한 값이고 지연·오류가 있을 수 있습니다.
 </footer>
-<script src="auth.js?v=4"></script>
-<script src="app.js?v=4"></script>
+<script src="auth.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

@@ -552,7 +552,8 @@ function renderFees() {
   if (!b) return;
   $("#feeWarn").innerHTML = b.verified
     ? `요율 확인일 ${esc(b.checked || "—")}. 이벤트 적용 여부에 따라 실제 비용은 달라질 수 있습니다.`
-    : `<b>요율 확인 필요</b> — 아래 숫자는 이벤트를 적용하지 않은 <b>일반적인 표준 수준을 넣은 기본값</b>이며 각 증권사 공지로 확인한 값이 아닙니다. 증권사는 신규 고객 이벤트로 수수료와 환율 우대를 자주 바꾸니, 본인 계좌의 요율을 표에 직접 넣어 계산하세요. (입력값은 이 브라우저에 저장됩니다)`;
+    : `<b>이벤트를 적용하지 않은 기본 요율입니다${b.checked ? ` (${esc(b.checked)} 대조)` : ""}.</b> ${esc(b.verified_note || "증권사 공지로 확인한 값이 아닙니다.")}
+       이벤트(아래 ‘진행 중 이벤트’)가 적용되는 계좌라면 표에 해당 요율을 직접 넣어 계산하세요. 입력값은 이 브라우저에 저장됩니다.${b.fx_note ? `<br>${esc(b.fx_note)}` : ""}`;
   const amount = parseNum($("#feeAmount").value), rate = parseNum($("#feeRate").value);
   const rows = b.brokers.map((x) => {
     const o = S.feeOv[x.id] || {};
@@ -569,6 +570,12 @@ function renderFees() {
     <td class="num ${r.buy === best && rows.some((x) => x.buy !== best) ? "best" : ""}">${won(r.buy)}</td><td class="num">${won(r.round)}</td></tr>`).join("");
   $("#feeNote").innerHTML = `${amount ? `${won(amount)}어치를 살 때 기준` : ""}${rate ? ` · 환율 ${fmt(rate, 1)}원이면 약 $${fmt(amount / rate, 0)}` : ""}. 환전 비용 = 금액 × 스프레드 × (1 − 우대율), 매수 수수료 = 금액 × 수수료율.
     ‘사고팔 때 합계’는 같은 금액을 다시 팔아 원화로 바꿀 때까지의 왕복 비용입니다.<br>${esc(b.sec_fee_note || "")} ${esc(b.tax_note || "")}`;
+  // 증권사별 주의사항·진행 중 이벤트·근거 (안내용 — 계산에는 넣지 않는다)
+  $("#feeInfo").innerHTML = `<div class="eyebrow" style="margin:22px 0 10px">증권사별 참고 · 계산에는 반영되지 않음</div>` + b.brokers.map((x) => `<div class="panel pad" style="margin-bottom:10px">
+    <h3 style="margin-bottom:6px">${esc(x.name)}</h3>
+    ${x.note ? `<p style="margin:0 0 8px;color:var(--text2)"><b>주의</b> ${esc(x.note)}</p>` : ""}
+    ${(x.events || []).length ? `<div class="small" style="color:var(--text2)"><b>진행 중이라고 알려진 이벤트</b> (조건·기간 확인 필요)<ul class="plain" style="margin:4px 0 0">${x.events.map((e) => `<li>${esc(e)}</li>`).join("")}</ul></div>` : ""}
+    ${(x.refs || []).length ? `<div class="small dim" style="margin-top:8px">근거: ${x.refs.map((r) => `<a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener noreferrer">${esc(r.label)}</a>`).join(" · ")}</div>` : ""}</div>`).join("");
 }
 
 // ---------- 종목 상세 ----------
@@ -766,7 +773,7 @@ function renderMine() {
   }
   if (priced.length < rows.length) warns.push(`가격을 못 받은 종목 ${rows.length - priced.length}개는 평가금액에서 빠졌습니다. S&P 500 밖 종목은 설정 탭에 Finnhub 키를 넣어야 가격이 보입니다.`);
   if (rows.some((r) => !r.rate)) warns.push(`‘기타·미지정’ 증권사 종목은 수수료를 반영하지 못합니다. 증권사를 골라 주세요.`);
-  if (!S.brokers?.verified) warns.push(`증권사 수수료율은 <b>확인 전 기본값</b>입니다. <a href="#" data-goto="fees">수수료 탭</a>에서 본인 요율로 고치면 아래 금액에 바로 반영됩니다.`);
+  if (!S.brokers?.verified) warns.push(`증권사 수수료율은 <b>이벤트 미적용 기본 요율(블로그 등 2차 자료로 대조)</b>입니다. <a href="#" data-goto="fees">수수료 탭</a>에서 본인 요율로 고치면 아래 금액에 바로 반영됩니다.`);
 
   const rateText = (r) => (r ? `매매 ${fmt(r.c, 2)}% · 환전 ${fmt(r.s, 2)}% (우대 ${fmt(r.d, 0)}%)` : "요율 없음");
   const pl$ = (v, d = 0) => `<span class="${cls(v)}">${sign(v, d)}</span>`;
