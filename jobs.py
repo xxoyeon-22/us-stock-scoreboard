@@ -233,12 +233,19 @@ def run_flow(limit=None) -> None:
     client = Finnhub(key, s_cfg["base_url"], int(os.environ.get("FINNHUB_RPM", s_cfg["requests_per_minute"])))
     d = outdir()
     stocks = _stocks(d, limit)
-    out = dict((read_json(d / "x_flow.json") or {}).get("stocks", {}))
+    path = d / "x_flow.json"
+    prev = read_json(path) or {}
+    out = dict(prev.get("stocks", {}))
+    done = set(out) if prev.get("partial") else set()          # 중간에 끊겼던 수집은 이어서 한다
     frm = (now() - timedelta(days=200)).strftime("%Y-%m-%d")
     to = now().strftime("%Y-%m-%d")
     ok = 0
     for i, s in enumerate(stocks, 1):
         sym = s["symbol"]
+        if sym in done:
+            continue
+        if i % 40 == 0:                                         # 오래 걸리는 작업이라 중간 결과를 저장해 둔다
+            write_json(path, {"saved_at": iso(), "partial": True, "stocks": out, **({"fetched_at": prev["fetched_at"]} if prev.get("fetched_at") else {})})
         try:
             ins = client.insider_sentiment(sym, frm, to)
             rec = client.recommendation(sym)
@@ -262,9 +269,9 @@ def run_flow(limit=None) -> None:
         if row:
             out[sym] = row
             ok += 1
-        if i % 50 == 0:
-            print(f"[flow] {i}/{len(stocks)}")
-    write_json(d / "x_flow.json", {"fetched_at": iso(), "stocks": out})
+        if i % 25 == 0:
+            print(f"[flow] {i}/{len(stocks)} (API 호출 {client.calls}회)", flush=True)
+    write_json(path, {"fetched_at": iso(), "stocks": out})
     print(f"[flow] {ok}개 종목 (API 호출 {client.calls}회)")
 
 
