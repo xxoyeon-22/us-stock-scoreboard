@@ -1,0 +1,12 @@
+universe:
+  name: S&P 500
+  # 열: Symbol, Security, GICS Sector, ...
+  url: https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv
+  cache: config/sp500.csv     # 내려받기에 실패하면 마지막으로 받은 사본을 쓴다
+
+finnhub:
+  base_url: https://finnhub.io/api/v1
+  # 무료 플랜은 분당 60회. 브라우저의 실시간 시세 호출과 같은 키를 나눠 쓰므로 여유를 둔다.
+  requests_per_minute: 45
+
+output_dir: web/data

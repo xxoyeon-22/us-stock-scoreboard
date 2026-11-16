@@ -1,0 +1,87 @@
+# 종합 점수 가중치 — 출발점으로 잡은 임의값이다. 백테스트(6단계) 후 조정한다.
+# 데이터가 없는 구성 요소는 0점이 아니라 제외 후 가중치를 재분배한다.
+
+min_group_size: 5        # 섹터 내 유효 종목이 이보다 적으면 전체 유니버스 백분위로 대체
+
+regime:                  # 시장 국면 보정 계수 (4단계에서 자동 계산, 지금은 고정값)
+  min: 0.8
+  max: 1.1
+  current: 1.0
+
+components:
+  fundamental:
+    label: 펀더멘털
+    weight: 0.35
+    metrics:
+      revenue_growth:
+        label: 매출 성장률 (YoY)
+        unit: "%"
+        higher_better: true
+        source: metric
+        keys: [revenueGrowthTTMYoy, revenueGrowthQuarterlyYoy]
+      eps_growth:
+        label: EPS 성장률 (YoY)
+        unit: "%"
+        higher_better: true
+        source: metric
+        keys: [epsGrowthTTMYoy, epsGrowthQuarterlyYoy]
+      operating_margin:
+        label: 영업이익률
+        unit: "%"
+        higher_better: true
+        source: metric
+        keys: [operatingMarginTTM, operatingMarginAnnual]
+      roe:
+        label: ROE
+        unit: "%"
+        higher_better: true
+        source: metric
+        keys: [roeTTM, roeRfy]
+      earnings_surprise:
+        label: 어닝 서프라이즈 (최근 4분기 평균)
+        unit: "%"
+        higher_better: true
+        source: earnings
+
+  valuation:
+    label: 밸류에이션
+    weight: 0.20
+    metrics:
+      pe:
+        label: PER (TTM)
+        unit: "x"
+        higher_better: false
+        positive_only: true     # 적자(0 이하)는 최하위로 처리
+        source: metric
+        keys: [peTTM, peBasicExclExtraTTM, peExclExtraTTM]
+      forward_pe:
+        label: Forward PER
+        unit: "x"
+        higher_better: false
+        positive_only: true
+        source: metric
+        keys: [forwardPE]
+      ps:
+        label: PSR (TTM)
+        unit: "x"
+        higher_better: false
+        positive_only: true
+        source: metric
+        keys: [psTTM, psAnnual]
+      ev_ebitda:
+        label: EV/EBITDA
+        unit: "x"
+        higher_better: false
+        positive_only: true
+        source: metric
+        keys: [evEbitdaTTM]
+
+  investors:             # 2단계 (SEC 13F)
+    label: 투자자 포지션
+    weight: 0.20
+  news:                  # 3단계 (Claude 감성 분석)
+    label: 뉴스 감성
+    weight: 0.15
+  flow:                  # 2단계 (Form 4, 자사주, 13F 변화)
+    label: 수급
+    weight: 0.10

@@ -1,0 +1,18 @@
+# 유명 투자자 목록 (2단계 SEC 13F 수집용). 아직 코드에서 쓰지 않는다.
+# CIK 는 2단계 구현 시 EDGAR 에서 반드시 다시 확인한다 (기억에 의존해 적은 값).
+# weight: 13F 신호의 신뢰도 (멀티 전략 펀드는 종목 수가 많아 낮춘다).
+
+investors:
+  - {id: buffett,       name: 워런 버핏,           fund: Berkshire Hathaway,       cik: "0001067983", weight: 1.0, enabled: true}
+  - {id: ackman,        name: 빌 애크먼,           fund: Pershing Square,          cik: "0001336528", weight: 1.0, enabled: true}
+  - {id: druckenmiller, name: 스탠리 드러켄밀러,   fund: Duquesne Family Office,   cik: "0001536411", weight: 1.0, enabled: true}
+  - {id: tepper,        name: 데이비드 테퍼,       fund: Appaloosa Management,     cik: "0001656456", weight: 1.0, enabled: true}
+  - {id: dalio,         name: 레이 달리오,         fund: Bridgewater Associates,   cik: "0001350694", weight: 0.6, enabled: true}
+  - {id: wood,          name: 캐시 우드,           fund: ARK Invest,               cik: "0001697748", weight: 0.8, enabled: true}
+  - {id: klarman,       name: 세스 클라만,         fund: Baupost Group,            cik: "0001061768", weight: 1.0, enabled: true}
+  - {id: marks,         name: 하워드 막스,         fund: Oaktree Capital,          cik: "0000949509", weight: 0.6, enabled: true}
+  - {id: griffin,       name: 켄 그리핀,           fund: Citadel Advisors,         cik: "0001423053", weight: 0.3, enabled: true}
+  # 버리는 2025년 말 등록 해제로 신규 13F 가 없을 수 있다 → 확인 후 아래 대체 후보 중 하나를 켠다.
+  - {id: burry,         name: 마이클 버리,         fund: Scion Asset Management,   cik: "0001649339", weight: 0.8, enabled: false}
+  - {id: loeb,          name: 댄 로브,             fund: Third Point,              cik: "0001040273", weight: 1.0, enabled: true}
+  - {id: coleman,       name: 체이스 콜먼,         fund: Tiger Global,             cik: "0001167483", weight: 0.8, enabled: false}

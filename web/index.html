@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>미국 주식 스코어보드</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>미국 주식 스코어보드</h1>
+    <span id="market" class="pill">—</span>
+    <span id="live" class="pill off" title="실시간 시세 연결 상태">실시간 꺼짐</span>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button data-tab="rank" class="on" role="tab">추천 순위</button>
+    <button data-tab="news" role="tab">실시간 이슈 <span id="newsBadge" class="badge" hidden></span></button>
+    <button data-tab="settings" role="tab">설정</button>
+  </nav>
+</header>
+
+<div id="sampleBanner" class="banner warn" hidden>
+  지금 보이는 점수와 주가는 <b>화면 확인용 샘플(가짜 값)</b>입니다. 데이터 수집이 한 번 돌면 실제 값으로 바뀝니다.
+</div>
+<div id="keyBanner" class="banner" hidden>
+  실시간 주가를 보려면 <a href="#" data-goto="settings">설정</a>에서 Finnhub API 키를 넣으세요. 지금은 마지막 수집 시점의 가격입니다.
+</div>
+
+<main>
+  <section id="tab-rank">
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="티커·회사명 검색" autocomplete="off">
+      <select id="sector"><option value="">전체 섹터</option></select>
+      <span class="spacer"></span>
+      <span id="stamp" class="muted small"></span>
+    </div>
+    <div class="tablewrap">
+      <table id="rank">
+        <thead><tr>
+          <th class="num">#</th><th>종목</th><th class="hide-s">섹터</th>
+          <th class="num">점수</th><th class="num">전일 대비</th>
+          <th class="num hide-s">펀더멘털</th><th class="num hide-s">밸류에이션</th>
+          <th class="num">주가</th><th class="num">등락률</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+      <p id="empty" class="muted pad" hidden>표시할 종목이 없습니다.</p>
+    </div>
+    <div class="pager">
+      <button id="prev">이전</button><span id="pageinfo" class="muted small"></span><button id="next">다음</button>
+    </div>
+    <p class="muted small note" id="scopeNote"></p>
+  </section>
+
+  <section id="tab-news" hidden>
+    <div class="toolbar">
+      <select id="newsSource"><option value="">전체 언론사</option></select>
+      <label class="check"><input type="checkbox" id="newsTagged"> 종목이 인식된 기사만</label>
+      <span class="spacer"></span>
+      <span id="newsStamp" class="muted small"></span>
+    </div>
+    <ul id="newsList" class="news"></ul>
+  </section>
+
+  <section id="tab-settings" hidden>
+    <div class="card">
+      <h2>실시간 시세 (Finnhub API 키)</h2>
+      <p class="muted">키는 <b>이 브라우저에만</b> 저장되고(localStorage) finnhub.io 로만 전송됩니다. 저장소나 이 사이트 서버에는 올라가지 않습니다.
+        무료 키는 <a href="https://finnhub.io/register" target="_blank" rel="noopener">finnhub.io</a> 에서 발급받습니다.</p>
+      <div class="row">
+        <input id="key" type="password" placeholder="Finnhub API 키" autocomplete="off" spellcheck="false">
+        <button id="saveKey" class="primary">저장</button>
+        <button id="clearKey">지우기</button>
+      </div>
+      <p id="keyStatus" class="small muted"></p>
+    </div>
+    <div class="card">
+      <h2>갱신 주기</h2>
+      <ul class="plain">
+        <li><b>주가</b> — 키가 있으면 화면에 보이는 종목(최대 50개)의 체결가를 웹소켓으로 즉시 반영</li>
+        <li><b>이슈(뉴스)</b> — 키가 있으면 1분마다 브라우저가 직접 새 헤드라인 확인, 없으면 약 10분마다 수집본 갱신</li>
+        <li><b>점수</b> — 미국 장 마감 후 하루 1회 재계산</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>점수 구성</h2>
+      <div id="weights"></div>
+    </div>
+  </section>
+</main>
+
+<aside id="drawer" class="drawer" hidden aria-label="종목 상세">
+  <button id="closeDrawer" class="close" aria-label="닫기">×</button>
+  <div id="detail"></div>
+</aside>
+<div id="scrim" class="scrim" hidden></div>
+
+<footer>
+  투자 판단의 책임은 본인에게 있으며, 본 정보는 투자 권유가 아닙니다. 점수는 공개 데이터를 기계적으로 계산한 값이고 지연·오류가 있을 수 있습니다.
+</footer>
+<script src="app.js"></script>
+</body>
+</html>
