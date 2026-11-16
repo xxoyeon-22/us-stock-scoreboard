@@ -437,13 +437,56 @@ function renderTonight() {
 }
 
 // ---------- 투자자 ----------
+// 성향 = 13F 공시 숫자로 계산한 규칙 기반 참고치: 집중도 40% + 변동성(보유 종목 평균 베타) 35% + 매매 활발도 25%.
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+function investorProfile(i) {
+  const hs = (i.holdings || []).filter((h) => !h.put_call), c = i.counts || {};
+  const top5 = hs.slice(0, 5).reduce((t, h) => t + (h.pct || 0), 0);
+  const n = i.positions || hs.length, base = n + (c.exit || 0);
+  const turnover = base ? ((c.new || 0) + (c.exit || 0)) / base : null;
+  let bw = 0, bsum = 0; const sec = {};
+  for (const h of hs) {
+    const st = h.ticker && S.bySymbol.get(h.ticker), b = st?.info?.beta;
+    if (b != null) { bw += h.pct * b; bsum += h.pct; }
+    if (st) sec[st.sector] = (sec[st.sector] || 0) + h.pct;
+  }
+  const beta = bsum >= 20 ? bw / bsum : null;            // 베타를 아는 종목이 포트폴리오의 20% 이상일 때만
+  const parts = [[clamp01((top5 - 15) / 55), 0.4], [beta != null ? clamp01((beta - 0.8) / 0.7) : null, 0.35], [turnover != null ? clamp01(turnover / 0.35) : null, 0.25]].filter(([v]) => v != null);
+  const wsum = parts.reduce((t, [, w]) => t + w, 0);
+  const score = wsum ? Math.round(parts.reduce((t, [v, w]) => t + v * w, 0) / wsum * 100) : null;
+  const label = score == null ? null : score >= 62 ? ["공격적", "up"] : score <= 38 ? ["보수적", "down"] : ["균형형", ""];
+  return { top5, n, turnover, beta, betaCov: bsum, score, label, c, topSec: Object.entries(sec).sort((a, b) => b[1] - a[1]).slice(0, 2) };
+}
+function profilePanel(i, p) {
+  if (p.score == null) return "";
+  const bar = (v) => `<span class="bar" aria-hidden="true"><i style="width:${Math.round(v * 100)}%"></i></span>`;
+  const row = (name, v, text) => `<div class="prow"><b>${name}</b>${v == null ? `<span></span>` : bar(v)}<span class="dim">${text}</span></div>`;
+  return `<div class="ai" style="margin-bottom:16px"><div class="lbl">투자 성향 · 공시 숫자로 계산한 참고치</div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-bottom:10px">
+      <span class="tag ${p.label[1]} fill big" style="font-size:14px">${p.label[0]}</span><span class="mono" style="font-size:20px;font-weight:600">${p.score}<span class="dim small"> / 100</span></span>
+      <span class="dim small">보수적 ◀ 0 ─── 100 ▶ 공격적</span>${i.style ? `<span class="tag">${esc(i.style)}</span>` : ""}</div>
+    ${row("집중도", clamp01((p.top5 - 15) / 55), `상위 5종목이 포트폴리오의 ${fmt(p.top5, 0)}% · 총 ${p.n}개 종목`)}
+    ${row("변동성", p.beta == null ? null : clamp01((p.beta - 0.8) / 0.7), p.beta == null ? "베타 자료가 있는 종목이 적어 계산하지 못했습니다" : `보유 종목 평균 베타 ${fmt(p.beta, 2)} — 시장보다 ${p.beta >= 1 ? "더" : "덜"} 출렁이는 편 (베타를 아는 종목 ${fmt(p.betaCov, 0)}% 기준)`)}
+    ${row("매매 활발도", p.turnover == null ? null : clamp01(p.turnover / 0.35), p.turnover == null ? "—" : `직전 분기에 신규 ${p.c.new ?? 0}개 · 전량 매도 ${p.c.exit ?? 0}개 — 종목의 ${fmt(p.turnover * 100, 0)}%가 바뀜`)}
+    ${p.topSec.length ? row("주요 업종", null, p.topSec.map(([s, v]) => `${esc(s)} ${fmt(v, 0)}%`).join(" · ") + " (S&P 500 종목 기준)") : ""}
+    <div class="caveat">공시된 미국 주식 매수(롱) 포지션만 본 계산이라 공매도·채권·해외 자산은 보이지 않습니다. 채권이 중심인 곳(오크트리)이나 여러 자산을 나눠 담는 곳(브리지워터)은 실제 성향과 다르게 나올 수 있습니다. 빨강·파랑은 성향의 뜨거움·차분함을 뜻하며 주가 등락과는 무관합니다.</div></div>`;
+}
+function compareHTML(list) {
+  const rows = list.map((i) => ({ i, p: investorProfile(i) })).filter((r) => r.p.score != null).sort((a, b) => b.p.score - a.p.score);
+  if (!rows.length) return "";
+  return `<div class="eyebrow" style="margin-bottom:8px">한눈에 보는 성향 · 공격적 ↔ 보수적 (누르면 상세)</div>` + rows.map(({ i, p }) => `<div class="crow" data-inv="${esc(i.id)}" role="button" tabindex="0">
+    <span class="n">${esc(i.name)}</span><span class="bar" aria-hidden="true"><i style="width:${p.score}%;background:${p.label[1] === "up" ? "var(--up)" : p.label[1] === "down" ? "var(--down)" : "var(--on)"}"></i></span>
+    <span class="mono">${p.score}</span><span class="tag ${p.label[1]}">${p.label[0]}</span></div>`).join("");
+}
 function renderInvestors() {
   const d = S.investors;
   if (!d?.investors?.length) { $("#invList").innerHTML = ""; $("#invDetail").innerHTML = `<p class="empty panel">투자자 자료가 아직 없습니다. <span class="mono">python pipeline.py investors</span> 가 한 번 돌아야 합니다.</p>`; return; }
   if (!S.inv || !d.investors.some((i) => i.id === S.inv)) S.inv = d.investors[0].id;
   $("#invStamp").textContent = `수집 ${kst(d.generated_at)} KST`;
-  $("#invList").innerHTML = d.investors.map((i) => `<button data-inv="${esc(i.id)}" class="${i.id === S.inv ? "on" : ""}">
-    <div class="n">${esc(i.name)}</div><div class="f dim">${esc(i.fund)} · ${esc(i.style || "")}</div></button>`).join("");
+  $("#invCompare").innerHTML = compareHTML(d.investors);
+  $("#invList").innerHTML = d.investors.map((i) => { const p = investorProfile(i);
+    return `<button data-inv="${esc(i.id)}" class="${i.id === S.inv ? "on" : ""}">
+    <div class="n">${esc(i.name)} ${p.label ? `<span class="tag ${p.label[1]}" style="font-size:10px;padding:1px 6px">${p.label[0]}</span>` : ""}</div><div class="f dim">${esc(i.fund)} · ${esc(i.style || "")}</div></button>`; }).join("");
   const i = d.investors.find((x) => x.id === S.inv);
   const ai = S.analysis?.investors?.[i.id];
   const c = i.counts || {};
@@ -462,6 +505,7 @@ function renderInvestors() {
       <div><div class="eyebrow">공개 포트폴리오</div><div class="mono" style="font-size:19px">${usdBig(i.total_value)}</div><div class="dim small">${i.positions ?? "—"}개 종목</div></div>
       <div><div class="eyebrow">직전 분기 대비</div><div class="mono small" style="margin-top:4px"><span class="up">신규 ${c.new ?? 0} · 확대 ${c.add ?? 0}</span><br><span class="down">축소 ${c.trim ?? 0} · 매도 ${c.exit ?? 0}</span></div></div>
     </div>
+    ${profilePanel(i, investorProfile(i))}
     <div class="ai"><div class="lbl">AI 요약 · 최근 동향과 발언</div>${ai ? `<p>${esc(ai.summary)}</p>
       ${ai.remarks?.length ? `<ul>${ai.remarks.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}
       ${ai.portfolio_view ? `<p style="margin-top:10px"><b>포트폴리오 변화</b> — ${esc(ai.portfolio_view)}</p>` : ""}

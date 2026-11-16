@@ -213,6 +213,12 @@ body.locked > *:not(#gate) { visibility: hidden; }
 .gate-l { display: block; font-size: 12.5px; color: var(--dim); margin-bottom: 12px; } .gate-l input { display: block; width: 100%; margin-top: 4px; color: var(--text); }
 body:not(.is-admin) .admin-only { display: none !important; }
 
+/* 투자 성향 */
+.prow { display: grid; grid-template-columns: 92px 150px minmax(0, 1fr); gap: 4px 14px; align-items: center; padding: 6px 0; font-size: 13px; }
+.crow { display: grid; grid-template-columns: 130px minmax(0, 1fr) 34px 64px; gap: 12px; align-items: center; padding: 6px 4px; cursor: pointer; border-top: 1px solid var(--line2); }
+.crow:first-of-type { border-top: 0; } .crow:hover { background: #121317; } .crow .n { font-weight: 600; } .crow .tag { justify-content: center; }
+@media (max-width: 760px) { .prow { grid-template-columns: 80px minmax(0, 1fr); } .prow > .dim { grid-column: 1 / -1; } .crow { grid-template-columns: 96px minmax(0, 1fr) 30px 58px; } }
+
 /* 빛 효과 — 상승·호재 빨강, 하락·악재 파랑 */
 .up { text-shadow: 0 0 12px var(--up-glow); } .down { text-shadow: 0 0 12px var(--down-glow); }
 .blk.up, .tag.fill.up, button.tk.up, .sq.u, .mark .u, .outlook.up .dir { box-shadow: 0 0 16px -2px var(--up-glow); text-shadow: none; }
